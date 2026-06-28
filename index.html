@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#08111f" />
+    <title>Juko Bot v2</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Juko Bot v2</p>
+          <h1>Signal-Dashboard</h1>
+        </div>
+        <button id="refreshButton" class="icon-button" type="button" aria-label="Aktualisieren">↻</button>
+      </header>
+
+      <section id="statusCard" class="hero-card state-neutral">
+        <div class="signal-header">
+          <span class="label">Marktlage</span>
+          <span id="updatedAt" class="muted">—</span>
+        </div>
+        <div class="signal-layout">
+          <div class="signal-main">
+            <h2 id="mainSignal">Keine Daten</h2>
+            <p id="systemStatus">Bitte API-URL eintragen.</p>
+          </div>
+          <div class="risk-grid" aria-label="Volatilitätsfilter">
+            <div id="vixCard" class="risk-card risk-unknown">
+              <div class="risk-topline">
+                <span>VIX</span>
+                <strong id="latestVix">—</strong>
+              </div>
+              <span id="latestVixStatus" class="risk-status">Keine Daten</span>
+              <small id="latestVixLimits">OK ≤ 25 · STOP ≥ 30</small>
+            </div>
+            <div id="vxnCard" class="risk-card risk-unknown">
+              <div class="risk-topline">
+                <span>VXN</span>
+                <strong id="latestVxn">—</strong>
+              </div>
+              <span id="latestVxnStatus" class="risk-status">Keine Daten</span>
+              <small id="latestVxnLimits">OK ≤ 30 · STOP ≥ 35</small>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <nav class="tabs" aria-label="Bereiche">
+        <button class="tab-button active" type="button" data-tab="cockpit">Cockpit</button>
+        <button class="tab-button" type="button" data-tab="depot">Depot</button>
+        <button class="tab-button" type="button" data-tab="charts">Charts</button>
+        <button class="tab-button" type="button" data-tab="setup">Setup</button>
+      </nav>
+
+      <section id="tab-cockpit" class="tab-panel active">
+        <article id="weeklySummary" class="weekly-summary">
+          <div class="weekly-summary-header">
+            <button id="previousWeekButton" class="week-nav-button" type="button" aria-label="Vorherige Woche">‹</button>
+            <div class="week-heading">
+              <span id="weekState" class="label">Aktuelle Woche</span>
+              <h2 id="weekTitle">—</h2>
+              <span id="weekRange" class="muted">—</span>
+            </div>
+            <button id="nextWeekButton" class="week-nav-button" type="button" aria-label="Nächste Woche">›</button>
+          </div>
+          <div class="weekly-signal-row">
+            <div>
+              <span class="label">Wochen-Signal</span>
+              <strong id="weekSignal">—</strong>
+            </div>
+            <div class="week-counts" aria-label="Signaltage dieser Woche">
+              <span class="week-count count-buy"><strong id="weekBuyDays">0</strong>Kaufen</span>
+              <span class="week-count count-wait"><strong id="weekWaitDays">0</strong>Warten</span>
+              <span class="week-count count-sell"><strong id="weekSellDays">0</strong>Verkaufen</span>
+            </div>
+          </div>
+          <p class="weekly-execution-note">
+            Verkauf: Freitagabend · Kauf: Montagvormittag der Folgewoche
+          </p>
+        </article>
+
+        <div class="section-title">
+          <div>
+            <span class="label">Signale</span>
+            <h2>Alle Nasdaq-Aktien</h2>
+          </div>
+          <span id="signalCount" class="muted">—</span>
+        </div>
+        <p class="muted small">Grün = Top 10, Gelb = Puffer Rang 11–12 oder gesperrt, Rot = darunter.</p>
+        <input id="rankingSearch" class="search-input" type="search" placeholder="Ticker oder Name suchen" />
+        <div id="rankingList" class="ranking-table"></div>
+      </section>
+
+      <section id="tab-depot" class="tab-panel">
+        <div class="section-title">
+          <div>
+            <span class="label">Eigene Aktien</span>
+            <h2>Depot-Abgleich</h2>
+          </div>
+        </div>
+        <form id="addTickerForm" class="ticker-form">
+          <input id="tickerInput" type="text" autocomplete="off" placeholder="z. B. NASDAQ:AMD" />
+          <button class="primary-button" type="submit">Hinzufügen</button>
+        </form>
+        <p class="muted small">Rang 13+ wird beobachtet. Nach 14 Tagen außerhalb Top 12 erscheint KICKEN.</p>
+        <div id="depotList" class="decision-list"></div>
+      </section>
+
+      <section id="tab-charts" class="tab-panel">
+        <div class="chart-toolbar">
+          <div>
+            <span class="label">Chart-Zeitraum</span>
+            <div id="chartRangeControl" class="segmented-control" role="group" aria-label="Chart-Zeitraum auswählen">
+              <button type="button" data-chart-days="5">5T</button>
+              <button type="button" data-chart-days="30" class="active">30T</button>
+              <button type="button" data-chart-days="90">90T</button>
+              <button type="button" data-chart-days="180">180T</button>
+              <button type="button" data-chart-days="252">1J</button>
+              <button type="button" data-chart-days="all">Alle</button>
+            </div>
+          </div>
+          <span id="chartRangeSummary" class="muted">—</span>
+        </div>
+        <article class="chart-card">
+          <div class="section-title compact">
+            <h2>Nasdaq Signal</h2>
+            <span class="muted">Kurs, SMA200, Kauf-/Verkaufslinie</span>
+          </div>
+          <canvas id="nasdaqChart"></canvas>
+        </article>
+        <article class="chart-card">
+          <div class="section-title compact">
+            <h2>Tages-Signale</h2>
+            <span class="muted">Kaufen, Warten und Verkaufen im gewählten Zeitraum</span>
+          </div>
+          <canvas id="signalHistoryChart"></canvas>
+        </article>
+        <article class="chart-card">
+          <div class="section-title compact">
+            <h2>VIX</h2>
+            <span class="muted">OK/STOP-Zonen</span>
+          </div>
+          <canvas id="vixChart"></canvas>
+        </article>
+        <article class="chart-card">
+          <div class="section-title compact">
+            <h2>VXN</h2>
+            <span class="muted">OK/STOP-Zonen</span>
+          </div>
+          <canvas id="vxnChart"></canvas>
+        </article>
+      </section>
+
+      <section id="tab-setup" class="tab-panel">
+        <div class="section-title">
+          <div>
+            <span class="label">Verbindung</span>
+            <h2>API & Token</h2>
+          </div>
+        </div>
+        <div class="setup-panel embedded">
+          <label for="apiUrlInput">Apps-Script Web-App-URL</label>
+          <input id="apiUrlInput" type="url" placeholder="https://script.google.com/macros/s/.../exec" />
+          <label for="apiTokenInput">Depot-Token</label>
+          <input id="apiTokenInput" type="password" placeholder="Nur für Depot-Änderungen nötig" />
+          <p class="muted small">
+            Die URL und der Token werden nur lokal in diesem Browser gespeichert. Sie stehen nicht im GitHub-Code.
+          </p>
+          <div class="button-row">
+            <button id="saveSettingsButton" class="primary-button" type="button">Speichern</button>
+            <button id="clearSettingsButton" class="ghost-button" type="button">Zurücksetzen</button>
+          </div>
+        </div>
+      </section>
+
+      <p id="errorMessage" class="error-message" hidden></p>
+    </main>
+  </body>
+</html>
