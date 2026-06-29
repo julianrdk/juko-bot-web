@@ -317,6 +317,13 @@ function moveActiveTickerSuggestion(direction) {
   renderTickerSuggestions();
 }
 
+function getGoogleFinanceUrl(ticker) {
+  const match = String(ticker || '').trim().toUpperCase().match(/^([A-Z0-9]+):([A-Z0-9.-]+)$/);
+  if (!match) return '';
+  const [, exchange, symbol] = match;
+  return `https://www.google.com/finance/quote/${encodeURIComponent(symbol)}:${encodeURIComponent(exchange)}`;
+}
+
 function renderRanking(items) {
   const query = document.querySelector('#rankingSearch').value.trim().toUpperCase();
   const list = document.querySelector('#rankingList');
@@ -337,6 +344,7 @@ function renderRanking(items) {
       const blockReason = item.displayGroup === 'sma' ? '' : getBlockReason(item);
       const div = document.createElement('div');
       div.className = `ranking-row ${item.displayGroup === 'sma' ? 'rank-sma' : getRankZoneClass(item.rank)}`;
+      const quoteUrl = getGoogleFinanceUrl(item.ticker);
       div.innerHTML = `
         <span class="rank">${item.displayRank}</span>
         <div>
@@ -346,6 +354,17 @@ function renderRanking(items) {
         </div>
         <div class="score ${getMomentumClass(momentum)}">${formatPercent(momentum)}</div>
       `;
+      if (quoteUrl) {
+        const quoteLink = document.createElement('a');
+        quoteLink.className = 'quote-link';
+        quoteLink.href = quoteUrl;
+        quoteLink.target = '_blank';
+        quoteLink.rel = 'noopener noreferrer';
+        quoteLink.setAttribute('aria-label', `${item.ticker} bei Google Finance öffnen`);
+        quoteLink.title = 'Kurs bei Google Finance öffnen';
+        quoteLink.innerHTML = '<span aria-hidden="true">↗</span>';
+        div.append(quoteLink);
+      }
       list.append(div);
     });
 }

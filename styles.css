@@ -625,7 +625,7 @@ input::placeholder { color: #756746; }
 
 .ranking-row {
   display: grid;
-  grid-template-columns: 2.75rem minmax(0, 1fr) minmax(5.3rem, auto);
+  grid-template-columns: 2.75rem minmax(0, 1fr) minmax(5.3rem, auto) 3rem;
   align-items: center;
   min-height: 4rem;
   border: 0;
@@ -713,6 +713,33 @@ input::placeholder { color: #756746; }
 .momentum-positive { color: var(--green); }
 .momentum-negative { color: var(--red); }
 .momentum-neutral { color: var(--muted); }
+
+.quote-link {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-left: 0.5rem;
+  place-items: center;
+  border: 1px solid var(--amber-dim);
+  color: var(--amber-bright);
+  font-family: var(--pixel);
+  font-size: 0.8rem;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.quote-link:hover,
+.quote-link:focus-visible {
+  border-color: var(--amber-bright);
+  background: rgba(230, 164, 0, 0.12);
+  outline: 1px solid var(--amber-bright);
+  outline-offset: 2px;
+}
+
+.ranking-row.rank-sma .quote-link {
+  border-color: #756f62;
+  color: #aaa18d;
+}
 
 .skeleton-row,
 .app.is-loading #statusCard {
@@ -934,14 +961,15 @@ input::placeholder { color: #756746; }
   .section-title { align-items: flex-end; }
 
   .ranking-row {
-    grid-template-columns: 2.35rem minmax(0, 1fr) minmax(4.8rem, auto);
+    grid-template-columns: 2.35rem minmax(0, 1fr) minmax(4.5rem, auto) 3rem;
     min-height: 3.75rem;
-    padding-right: 0.5rem;
+    padding-right: 0.35rem;
   }
 
   .ticker { font-size: 0.83rem; }
   .subtext { font-size: 0.62rem; }
   .score { font-size: 0.78rem; }
+  .quote-link { width: 2.75rem; height: 2.75rem; margin-left: 0.25rem; }
 
   .ticker-form { grid-template-columns: 1fr; }
   .decision-item { grid-template-columns: minmax(0, 1fr) auto; }
