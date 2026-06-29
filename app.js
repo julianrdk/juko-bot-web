@@ -450,10 +450,10 @@ function renderCharts(data) {
     data: {
       labels,
       datasets: [
-        lineDataset('NASDAQ-100', history.map(point => point.nasdaq), '#f7f7f7', 3),
-        lineDataset('SMA200', history.map(point => point.sma200), '#73a7ff', 2),
-        lineDataset('Kauf-Linie', history.map(point => point.buyLine), '#35d08f', 2),
-        lineDataset('Verkaufs-Linie', history.map(point => point.sellLine), '#ef5350', 2),
+        lineDataset('NASDAQ-100', history.map(point => point.nasdaq), '#ffc247', 3),
+        lineDataset('SMA200', history.map(point => point.sma200), '#9b8961', 2),
+        lineDataset('Kauf-Linie', history.map(point => point.buyLine), '#78b83e', 2),
+        lineDataset('Verkaufs-Linie', history.map(point => point.sellLine), '#d9553f', 2),
       ],
     },
   });
@@ -474,8 +474,8 @@ function signalHistoryChartConfig(labels, history) {
       datasets: [{
         label: 'Tages-Signal',
         data: values,
-        borderColor: '#dbe7f7',
-        backgroundColor: '#dbe7f7',
+        borderColor: '#e7d7ad',
+        backgroundColor: '#e7d7ad',
         borderWidth: 2,
         stepped: true,
         tension: 0,
@@ -521,9 +521,9 @@ function chartValueToSignal(value) {
 }
 
 function signalColor(signal) {
-  if (signal === 'KAUFEN') return '#35d08f';
-  if (signal === 'VERKAUFEN') return '#ef5350';
-  return '#f7c948';
+  if (signal === 'KAUFEN') return '#78b83e';
+  if (signal === 'VERKAUFEN') return '#d9553f';
+  return '#e6a400';
 }
 
 function getVisibleChartHistory(history) {
@@ -557,9 +557,9 @@ function thresholdChartConfig(labels, values, label, ok, stop) {
     data: {
       labels,
       datasets: [
-        lineDataset(label, values, '#f7f7f7', 3),
-        lineDataset('OK', values.map(() => ok), '#35d08f', 2),
-        lineDataset('STOP', values.map(() => stop), '#ef5350', 2),
+        lineDataset(label, values, '#ffc247', 3),
+        lineDataset('OK', values.map(() => ok), '#78b83e', 2),
+        lineDataset('STOP', values.map(() => stop), '#d9553f', 2),
       ],
     },
   };
@@ -590,23 +590,23 @@ function replaceChart(existing, canvasId, config) {
       maintainAspectRatio: false,
       ...customOptions,
       plugins: {
-        legend: { labels: { color: '#dbe7f7' } },
+        legend: { labels: { color: '#e7d7ad', font: { family: 'IBM Plex Mono' } } },
         ...customPlugins,
       },
       scales: {
         x: {
           ...customScales.x,
           ticks: {
-            color: '#91a4bd',
+            color: '#9b8961',
             maxTicksLimit: window.matchMedia('(max-width: 560px)').matches ? 5 : 8,
             ...(customScales.x?.ticks || {}),
           },
-          grid: { color: 'rgba(255,255,255,0.06)', ...(customScales.x?.grid || {}) },
+          grid: { color: 'rgba(230,164,0,0.10)', ...(customScales.x?.grid || {}) },
         },
         y: {
           ...customScales.y,
-          ticks: { color: '#91a4bd', ...(customScales.y?.ticks || {}) },
-          grid: { color: 'rgba(255,255,255,0.06)', ...(customScales.y?.grid || {}) },
+          ticks: { color: '#9b8961', ...(customScales.y?.ticks || {}) },
+          grid: { color: 'rgba(230,164,0,0.10)', ...(customScales.y?.grid || {}) },
         },
       },
     },
