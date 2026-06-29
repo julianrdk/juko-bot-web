@@ -2,6 +2,7 @@ const STORAGE_KEYS = {
   apiUrl: 'juko_v2_api_url',
   apiToken: 'juko_v2_api_token',
   chartDays: 'juko_v2_chart_days',
+  lockClientId: 'juko_v2_lock_client_id',
 };
 
 const PUBLIC_API_URL = 'https://script.google.com/macros/s/AKfycbwPuSxd_GqUrJCTh78W37o2QELsFAWRoIuj4L7yTQ1oAN5ofUJ3u6hv-vZJ0tE6Y8L-kA/exec';
@@ -63,9 +64,11 @@ let tickerSuggestions = [];
 let lockSequence = [];
 let dashboardInitialized = false;
 let lockRequestPending = false;
+let apiSessionToken = '';
 
 function getApiUrl() {
-  return localStorage.getItem(STORAGE_KEYS.apiUrl) || PUBLIC_API_URL;
+  const storedUrl = localStorage.getItem(STORAGE_KEYS.apiUrl) || '';
+  return isAllowedApiUrl(storedUrl) ? storedUrl : PUBLIC_API_URL;
 }
 
 function getLockApiUrl() {
@@ -74,6 +77,26 @@ function getLockApiUrl() {
 
 function getApiToken() {
   return localStorage.getItem(STORAGE_KEYS.apiToken) || '';
+}
+
+function getLockClientId() {
+  let clientId = localStorage.getItem(STORAGE_KEYS.lockClientId) || '';
+  if (!/^[a-zA-Z0-9_-]{16,80}$/.test(clientId)) {
+    clientId = crypto.randomUUID().replace(/-/g, '');
+    localStorage.setItem(STORAGE_KEYS.lockClientId, clientId);
+  }
+  return clientId;
+}
+
+function isAllowedApiUrl(value) {
+  try {
+    const url = new URL(String(value || ''));
+    return url.protocol === 'https:'
+      && url.hostname === 'script.google.com'
+      && /^\/macros\/s\/[a-zA-Z0-9_-]+\/exec$/.test(url.pathname);
+  } catch (error) {
+    return false;
+  }
 }
 
 function setError(message) {
@@ -88,17 +111,31 @@ function loadJsonp(url, params = {}) {
     const query = new URLSearchParams({ ...params, callback: callbackName });
     const separator = url.includes('?') ? '&' : '?';
     const script = document.createElement('script');
-
-    window[callbackName] = payload => {
-      resolve(payload);
+    let settled = false;
+    const cleanup = () => {
+      window.clearTimeout(timeoutId);
       script.remove();
       delete window[callbackName];
     };
+    const timeoutId = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('API-Zeitüberschreitung'));
+    }, 12000);
+
+    window[callbackName] = payload => {
+      if (settled) return;
+      settled = true;
+      resolve(payload);
+      cleanup();
+    };
 
     script.onerror = () => {
+      if (settled) return;
+      settled = true;
       reject(new Error('API nicht erreichbar'));
-      script.remove();
-      delete window[callbackName];
+      cleanup();
     };
 
     script.src = `${url}${separator}${query.toString()}`;
@@ -115,7 +152,8 @@ async function readApi() {
     return;
   }
 
-  const payload = await loadJsonp(apiUrl, { action: 'read' });
+  if (!apiSessionToken) throw new Error('Sitzung abgelaufen. Seite neu laden.');
+  const payload = await loadJsonp(apiUrl, { action: 'read', sessionToken: apiSessionToken });
   if (!payload.ok) throw new Error(payload.error || 'API-Fehler');
   currentData = payload.result;
   render(currentData);
@@ -125,11 +163,27 @@ async function readApi() {
 async function mutateDepot(action, ticker) {
   const apiUrl = getApiUrl();
   const token = getApiToken();
-  if (!apiUrl || !token) throw new Error('API-URL oder Depot-Token fehlt.');
-
-  const payload = await loadJsonp(apiUrl, { action, ticker, token });
-  if (!payload.ok) throw new Error(payload.error || 'Depot-Änderung fehlgeschlagen');
+  if (!apiUrl || !token || !apiSessionToken) throw new Error('API-Sitzung oder Depot-Token fehlt.');
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 12000);
+  try {
+    await fetch(apiUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body: JSON.stringify({ action, payload: { ticker }, token, sessionToken: apiSessionToken }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    throw new Error(error.name === 'AbortError' ? 'API-Zeitüberschreitung' : 'Depot-Änderung fehlgeschlagen');
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
   await readApi();
+  const exists = (currentData.depot || []).some(item => item.ticker === ticker);
+  if ((action === 'addTicker' && !exists) || (action === 'removeTicker' && exists)) {
+    throw new Error('Depot-Änderung wurde nicht übernommen.');
+  }
 }
 
 function render(data) {
@@ -196,6 +250,7 @@ function renderDepot(items) {
     .sort(compareDepotRows)
     .forEach(item => {
     const action = String(item.action || 'PRÜFEN').toLowerCase();
+    const actionClass = action.replace(/[^a-zäöüß-]/g, '') || 'prüfen';
     const rank = Number(item.rank);
     const hasRank = hasNumericRank(item.rank);
     const isOutsideTop12 = !hasRank || rank > 12;
@@ -208,12 +263,13 @@ function renderDepot(items) {
     div.className = 'decision-item';
     div.innerHTML = `
       <div>
-        <div class="ticker">${item.ticker}</div>
-        <div class="subtext depot-meta">${details.map(detail => `<span>${detail}</span>`).join('')}</div>
+        <div class="ticker">${escapeHtml(item.ticker)}</div>
+        <div class="subtext depot-meta">${details.map(detail => `<span>${escapeHtml(detail)}</span>`).join('')}</div>
       </div>
-      <span class="badge badge-${action}">${item.action || 'PRÜFEN'}</span>
-      <button class="remove-button" type="button" data-ticker="${item.ticker}">×</button>
+      <span class="badge badge-${actionClass}">${escapeHtml(item.action || 'PRÜFEN')}</span>
+      <button class="remove-button" type="button">×</button>
     `;
+    div.querySelector('.remove-button').dataset.ticker = item.ticker;
     list.append(div);
   });
 }
@@ -262,7 +318,7 @@ function renderTickerSuggestions() {
     option.dataset.ticker = item.ticker;
     option.setAttribute('role', 'option');
     option.setAttribute('aria-selected', String(index === activeSuggestionIndex));
-    option.innerHTML = `<strong>${item.ticker}</strong><span class="ticker-suggestion-name">${item.name || '—'}</span>`;
+    option.innerHTML = `<strong>${escapeHtml(item.ticker)}</strong><span class="ticker-suggestion-name">${escapeHtml(item.name || '—')}</span>`;
     list.append(option);
   });
 }
@@ -300,9 +356,9 @@ function renderRanking(items) {
       div.innerHTML = `
         <span class="rank">${item.displayRank}</span>
         <div>
-          <div class="ticker">${item.ticker}</div>
-          <div class="subtext">${item.name || '—'} · ${formatCurrency(item.price)}</div>
-          ${blockReason ? `<div class="block-reason">${blockReason}</div>` : ''}
+          <div class="ticker">${escapeHtml(item.ticker)}</div>
+          <div class="subtext">${escapeHtml(item.name || '—')} · ${escapeHtml(formatCurrency(item.price))}</div>
+          ${blockReason ? `<div class="block-reason">${escapeHtml(blockReason)}</div>` : ''}
         </div>
         <div class="score ${getMomentumClass(momentum)}">${formatPercent(momentum)}</div>
       `;
@@ -660,6 +716,16 @@ function formatShortDate(value) {
   return new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit' }).format(new Date(value));
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>'"]/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    "'": '&#39;',
+    '"': '&quot;',
+  })[character]);
+}
+
 function initializeLockScreen() {
   const grid = document.querySelector('#moneyGrid');
   grid.innerHTML = '';
@@ -711,11 +777,17 @@ async function verifyLockSequence() {
     const apiUrl = getLockApiUrl();
     if (!apiUrl) throw new Error('Lock-API fehlt');
     const patternHash = await sha256Hex(lockSequence.join(','));
-    const payload = await loadJsonp(apiUrl, { action: 'verifyLock', patternHash });
+    const payload = await loadJsonp(apiUrl, {
+      action: 'verifyLock',
+      patternHash,
+      clientId: getLockClientId(),
+    });
     if (!payload.ok || !payload.result?.unlocked) {
       resetLockScreen(true);
       return;
     }
+    apiSessionToken = String(payload.result.sessionToken || '');
+    if (!apiSessionToken) throw new Error('Ungültige API-Sitzung');
     await playUnlockAnimation();
     unlockDashboard();
   } catch (error) {
@@ -797,7 +869,12 @@ function bindEvents() {
   });
 
   document.querySelector('#saveSettingsButton').addEventListener('click', () => {
-    localStorage.setItem(STORAGE_KEYS.apiUrl, document.querySelector('#apiUrlInput').value.trim());
+    const apiUrl = document.querySelector('#apiUrlInput').value.trim();
+    if (apiUrl && !isAllowedApiUrl(apiUrl)) {
+      setError('Nur eine gültige Apps-Script-/exec-URL ist erlaubt.');
+      return;
+    }
+    localStorage.setItem(STORAGE_KEYS.apiUrl, apiUrl);
     localStorage.setItem(STORAGE_KEYS.apiToken, document.querySelector('#apiTokenInput').value.trim());
     readApi().catch(error => setError(error.message));
   });
