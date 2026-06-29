@@ -71,6 +71,10 @@ body.is-locked .app {
   transition: opacity 320ms steps(5, end);
 }
 
+.lock-screen[hidden] {
+  display: none;
+}
+
 .money-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(78px, 112px));
@@ -255,7 +259,10 @@ body.is-locked .app {
 .lock-error { animation: lockError 420ms steps(2, end); }
 .lock-error .unlock-button { border-color: var(--red); color: var(--red); }
 
-.lock-success { opacity: 0; }
+.lock-success {
+  pointer-events: none;
+  opacity: 0;
+}
 .lock-success .money-node { pointer-events: none; }
 .final-burn .ash-pile { animation: ashDrop 420ms steps(4, end) both; }
 
