@@ -157,18 +157,31 @@ body.is-locked .app {
   position: absolute;
   z-index: 5;
   display: none;
-  width: 6px;
-  height: 10px;
+  width: 10px;
+  height: 15px;
   background: var(--red);
   box-shadow:
-    0 -5px 0 var(--amber-bright),
-    5px 0 0 var(--amber),
-    -3px 5px 0 var(--amber-bright);
-  animation: pixelFlame 360ms steps(2, end) infinite alternate;
+    0 -8px 0 var(--amber-bright),
+    5px -4px 0 var(--red),
+    9px 3px 0 var(--amber),
+    -5px 5px 0 var(--amber-bright),
+    2px 10px 0 var(--red);
+  animation: pixelFlame 300ms steps(2, end) infinite alternate;
 }
 
-.flame-one { right: 3px; bottom: 5px; }
-.flame-two { right: 17px; bottom: 0; animation-delay: 120ms; }
+.pixel-flame::after {
+  position: absolute;
+  right: 2px;
+  bottom: 0;
+  width: 5px;
+  height: 9px;
+  content: "";
+  background: #ffe08a;
+  box-shadow: -3px 4px 0 var(--amber-bright);
+}
+
+.flame-one { right: -1px; bottom: 7px; }
+.flame-two { right: 21px; bottom: -1px; animation-delay: 100ms; }
 
 .ash-pile {
   position: absolute;
@@ -251,8 +264,8 @@ body.is-unlocked .app {
 }
 
 @keyframes pixelFlame {
-  from { transform: translate(0, 0) scaleY(0.85); }
-  to { transform: translate(-2px, -3px) scaleY(1.1); }
+  from { transform: translate(0, 1px) scale(0.9, 0.82); }
+  to { transform: translate(-3px, -5px) scale(1.08, 1.18); }
 }
 
 @keyframes lockError {
