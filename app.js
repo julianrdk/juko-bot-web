@@ -145,12 +145,7 @@ function loadJsonp(url, params = {}) {
 
 async function readApi() {
   const apiUrl = getApiUrl();
-  if (!apiUrl) {
-    currentData = sampleData;
-    render(currentData);
-    setError('API-URL fehlt. Öffne den Tab Setup und trage die Apps-Script Web-App-URL ein. Sample-Daten werden angezeigt.');
-    return;
-  }
+  if (!apiUrl) throw new Error('API-URL fehlt.');
 
   if (!apiSessionToken) throw new Error('Sitzung abgelaufen. Seite neu laden.');
   const payload = await loadJsonp(apiUrl, { action: 'read', sessionToken: apiSessionToken });
@@ -188,7 +183,6 @@ async function mutateDepot(action, ticker) {
 
 function render(data) {
   renderSettings();
-  renderHero(data);
   renderDepot(data.depot || []);
   renderRanking(data.signals || []);
   renderWeeklySummary(data.charts?.history || []);
@@ -198,24 +192,6 @@ function render(data) {
 function renderSettings() {
   document.querySelector('#apiUrlInput').value = getApiUrl();
   document.querySelector('#apiTokenInput').value = getApiToken();
-}
-
-function renderHero(data) {
-  const signal = data.cockpit?.mainSignal || 'WARTEN';
-  const config = data.config || {};
-  const vix = data.cockpit?.latestVix;
-  const vxn = data.cockpit?.latestVxn;
-  const statusCard = document.querySelector('#statusCard');
-  statusCard.className = 'hero-card';
-  statusCard.classList.add(signal === 'KAUFEN' ? 'state-green' : signal === 'VERKAUFEN' ? 'state-red' : 'state-yellow');
-
-  document.querySelector('#mainSignal').textContent = signal;
-  document.querySelector('#systemStatus').textContent = data.cockpit?.systemStatus || '—';
-  document.querySelector('#updatedAt').textContent = data.updatedAt ? formatDateTime(data.updatedAt) : '—';
-  document.querySelector('#signalCount').textContent = `${(data.signals || []).filter(item => !item.isMarketTicker).length} Aktien`;
-
-  renderRiskCard('vix', vix, config.vixOk || 25, config.vixStop || 30);
-  renderRiskCard('vxn', vxn, config.vxnOk || 30, config.vxnStop || 35);
 }
 
 function renderRiskCard(prefix, value, okLimit, stopLimit) {
@@ -346,13 +322,21 @@ function renderRanking(items) {
   const list = document.querySelector('#rankingList');
   list.innerHTML = '';
 
+  let smaDividerRendered = false;
   buildDisplayRanking(items)
     .filter(item => !query || item.ticker.includes(query) || (item.name || '').toUpperCase().includes(query))
     .forEach(item => {
+      if (item.displayGroup === 'sma' && !smaDividerRendered) {
+        const divider = document.createElement('div');
+        divider.className = 'sma-divider';
+        divider.textContent = 'Unter SMA200';
+        list.append(divider);
+        smaDividerRendered = true;
+      }
       const momentum = item.momentumAdjusted ?? item.momentum90;
-      const blockReason = getBlockReason(item);
+      const blockReason = item.displayGroup === 'sma' ? '' : getBlockReason(item);
       const div = document.createElement('div');
-      div.className = `ranking-row ${getRankZoneClass(item.rank)}`;
+      div.className = `ranking-row ${item.displayGroup === 'sma' ? 'rank-sma' : getRankZoneClass(item.rank)}`;
       div.innerHTML = `
         <span class="rank">${item.displayRank}</span>
         <div>
@@ -370,11 +354,24 @@ function buildDisplayRanking(items) {
   const stocks = items.filter(item => !item.isMarketTicker);
   const ranked = stocks
     .filter(item => hasNumericRank(item.rank))
-    .sort((left, right) => Number(left.rank) - Number(right.rank));
-  const blocked = stocks
-    .filter(item => !hasNumericRank(item.rank))
+    .sort((left, right) => Number(left.rank) - Number(right.rank))
+    .map(item => ({ ...item, displayGroup: 'ranked' }));
+  const underSma = stocks
+    .filter(item => !hasNumericRank(item.rank) && isUnderSma(item))
+    .sort(compareMomentumDescending)
+    .map(item => ({ ...item, displayGroup: 'sma' }));
+  const excluded = stocks
+    .filter(item => !hasNumericRank(item.rank) && !isUnderSma(item))
     .sort(compareMomentumDescending);
-  return ranked.concat(blocked).map((item, index) => ({ ...item, displayRank: index + 1 }));
+  return ranked.concat(underSma, excluded).map((item, index) => ({ ...item, displayRank: index + 1 }));
+}
+
+function isUnderSma(item) {
+  return !item.anomaly
+    && item.price !== null
+    && item.sma200 !== null
+    && (item.momentumAdjusted ?? item.momentum90) !== null
+    && (item.signal === 'GESPERRT' || item.aboveSma === false);
 }
 
 function compareMomentumDescending(left, right) {
@@ -422,14 +419,16 @@ function buildWeeklySummaries(history) {
     if (!point.date) return;
     const weekInfo = getIsoWeekInfo(new Date(point.date));
     if (!weeksByKey.has(weekInfo.key)) {
-      weeksByKey.set(weekInfo.key, { ...weekInfo, signals: [] });
+      weeksByKey.set(weekInfo.key, { ...weekInfo, signals: [], points: [] });
     }
-    weeksByKey.get(weekInfo.key).signals.push(String(point.signal || 'WARTEN').toUpperCase());
+    const week = weeksByKey.get(weekInfo.key);
+    week.signals.push(String(point.signal || 'WARTEN').toUpperCase());
+    week.points.push(point);
   });
 
   const currentWeek = getIsoWeekInfo(new Date());
   if (!weeksByKey.has(currentWeek.key)) {
-    weeksByKey.set(currentWeek.key, { ...currentWeek, signals: [] });
+    weeksByKey.set(currentWeek.key, { ...currentWeek, signals: [], points: [] });
   }
 
   return Array.from(weeksByKey.values())
@@ -444,6 +443,7 @@ function buildWeeklySummaries(history) {
         waitDays,
         sellDays,
         weeklySignal: calculateWeeklySignal(buyDays, waitDays, sellDays),
+        lastPoint: week.points[week.points.length - 1] || null,
       };
     });
 }
@@ -460,16 +460,26 @@ function renderSelectedWeek() {
   const week = weeklySummaries[selectedWeekIndex];
   const currentWeekKey = getIsoWeekInfo(new Date()).key;
   const isArchive = week.key !== currentWeekKey;
-  const summary = document.querySelector('#weeklySummary');
-  summary.className = `weekly-summary signal-${week.weeklySignal.toLowerCase()}${isArchive ? ' is-archive' : ''}`;
+  const summary = document.querySelector('#statusCard');
+  const hasWeekData = week.signals.length > 0;
+  const weeklySignal = hasWeekData ? week.weeklySignal : '—';
+  const lastPoint = week.lastPoint;
+  summary.className = `hero-card weekly-summary ${hasWeekData ? `state-${week.weeklySignal === 'KAUFEN' ? 'green' : week.weeklySignal === 'VERKAUFEN' ? 'red' : 'yellow'}` : 'state-neutral'}${isArchive ? ' is-archive' : ''}`;
 
   document.querySelector('#weekState').textContent = isArchive ? 'Wochenarchiv' : 'Aktuelle Woche';
   document.querySelector('#weekTitle').textContent = `KW ${week.week}`;
   document.querySelector('#weekRange').textContent = formatWeekRange(week.startDate, week.endDate);
-  document.querySelector('#weekSignal').textContent = week.weeklySignal;
+  document.querySelector('#mainSignal').textContent = weeklySignal;
+  document.querySelector('#dailySignal').textContent = lastPoint?.signal || '—';
+  document.querySelector('#updatedAt').textContent = lastPoint?.date ? formatDateTime(lastPoint.date) : '—';
   document.querySelector('#weekBuyDays').textContent = week.buyDays;
   document.querySelector('#weekWaitDays').textContent = week.waitDays;
   document.querySelector('#weekSellDays').textContent = week.sellDays;
+
+  const config = currentData.config || {};
+  renderRiskCard('vix', lastPoint?.vix ?? null, config.vixOk || 25, config.vixStop || 30);
+  renderRiskCard('vxn', lastPoint?.vxn ?? null, config.vxnOk || 30, config.vxnStop || 35);
+  document.querySelector('#signalCount').textContent = `${(currentData.signals || []).filter(item => !item.isMarketTicker).length} Aktien`;
 
   document.querySelector('#previousWeekButton').disabled = selectedWeekIndex === 0;
   document.querySelector('#nextWeekButton').disabled = selectedWeekIndex === weeklySummaries.length - 1;
@@ -772,6 +782,7 @@ async function verifyLockSequence() {
   lockRequestPending = true;
   const button = document.querySelector('#unlockButton');
   button.disabled = true;
+  button.classList.add('is-verifying');
 
   try {
     const apiUrl = getLockApiUrl();
@@ -795,6 +806,7 @@ async function verifyLockSequence() {
   } finally {
     lockRequestPending = false;
     button.disabled = false;
+    button.classList.remove('is-verifying');
   }
 }
 
@@ -848,14 +860,63 @@ function initializeDashboard() {
   if (dashboardInitialized) return;
   dashboardInitialized = true;
   bindEvents();
-  readApi().catch(error => {
-    currentData = sampleData;
-    render(sampleData);
-    setError(error.message);
-  });
+  loadDashboardData();
+}
+
+async function loadDashboardData() {
+  showDashboardLoading();
+  try {
+    await readApi();
+    showDashboardReady();
+  } catch (error) {
+    showDashboardError(error.message);
+  }
+}
+
+function showDashboardLoading() {
+  const dashboard = document.querySelector('#dashboard');
+  dashboard.classList.add('is-loading');
+  dashboard.classList.remove('load-failed');
+  document.querySelector('#loadError').hidden = true;
+  document.querySelectorAll('.tab-button').forEach(button => { button.disabled = true; });
+  document.querySelector('#rankingSearch').disabled = true;
+  document.querySelector('#mainSignal').textContent = '████';
+  document.querySelector('#dailySignal').textContent = '██';
+  document.querySelector('#weekTitle').textContent = '██ ██';
+  document.querySelector('#weekRange').textContent = '████████████';
+  document.querySelector('#weekBuyDays').textContent = '—';
+  document.querySelector('#weekWaitDays').textContent = '—';
+  document.querySelector('#weekSellDays').textContent = '—';
+  document.querySelector('#latestVix').textContent = '██';
+  document.querySelector('#latestVxn').textContent = '██';
+  document.querySelector('#latestVixStatus').textContent = '████';
+  document.querySelector('#latestVxnStatus').textContent = '████';
+  document.querySelector('#rankingList').innerHTML = Array.from({ length: 6 }, () => `
+    <div class="ranking-row skeleton-row" aria-hidden="true">
+      <span class="rank"></span><div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div><div class="skeleton-score"></div>
+    </div>
+  `).join('');
+}
+
+function showDashboardReady() {
+  const dashboard = document.querySelector('#dashboard');
+  dashboard.classList.remove('is-loading', 'load-failed');
+  document.querySelectorAll('.tab-button').forEach(button => { button.disabled = false; });
+  document.querySelector('#rankingSearch').disabled = false;
+  document.querySelector('#loadError').hidden = true;
+}
+
+function showDashboardError(message) {
+  const dashboard = document.querySelector('#dashboard');
+  dashboard.classList.remove('is-loading');
+  dashboard.classList.add('load-failed');
+  document.querySelector('#loadErrorMessage').textContent = message || 'Daten konnten nicht geladen werden.';
+  document.querySelector('#loadError').hidden = false;
+  document.querySelectorAll('.tab-button').forEach(button => { button.disabled = true; });
 }
 
 function bindEvents() {
+  document.querySelector('#retryLoadButton').addEventListener('click', loadDashboardData);
   document.querySelectorAll('.tab-button').forEach(button => {
     button.addEventListener('click', () => {
       document.querySelectorAll('.tab-button').forEach(item => item.classList.remove('active'));

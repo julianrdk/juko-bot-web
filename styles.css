@@ -256,6 +256,27 @@ body.is-locked .app {
   color: var(--bg);
 }
 
+.unlock-button.is-verifying { opacity: 1; }
+
+.unlock-button.is-verifying span {
+  width: 18px;
+  height: 18px;
+  border: 3px solid var(--amber-dim);
+  background: transparent;
+  animation: pixelVerify 520ms steps(4, end) infinite;
+}
+
+.unlock-button.is-verifying span::before,
+.unlock-button.is-verifying span::after {
+  width: 6px;
+  height: 6px;
+  background: var(--amber-bright);
+  transform: none;
+}
+
+.unlock-button.is-verifying span::before { top: -3px; right: -3px; }
+.unlock-button.is-verifying span::after { right: auto; bottom: -3px; left: -3px; }
+
 .lock-error { animation: lockError 420ms steps(2, end); }
 .lock-error .unlock-button { border-color: var(--red); color: var(--red); }
 
@@ -288,6 +309,13 @@ body.is-unlocked .app {
 @keyframes dashboardReveal {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+@keyframes pixelVerify { to { transform: rotate(360deg); } }
+
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.28; }
+  50% { opacity: 0.78; }
 }
 
 button,
@@ -451,7 +479,7 @@ h2 {
 .risk-status { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
 .risk-card small { color: var(--muted); font-size: 0.67rem; }
 .risk-ok .risk-status { color: var(--green); }
-.risk-warning .risk-status { color: var(--amber); }
+.risk-watch .risk-status { color: var(--amber); }
 .risk-stop .risk-status { color: var(--red); }
 .risk-unknown .risk-status { color: var(--muted); }
 
@@ -495,7 +523,7 @@ h2 {
 .weekly-summary {
   margin-bottom: 1rem;
   border-color: var(--line);
-  background: transparent;
+  background: var(--panel);
 }
 
 .weekly-summary.is-archive {
@@ -533,32 +561,10 @@ h2 {
 
 .week-nav-button:last-child { border-right: 0; border-left: 1px solid var(--line); }
 
-.weekly-signal-row {
-  display: grid;
-  grid-template-columns: minmax(150px, 0.75fr) minmax(0, 1.25fr);
-  align-items: stretch;
-}
-
-.weekly-signal-row > div:first-child {
-  display: grid;
-  align-content: center;
-  padding: 0.75rem;
-  border-right: 1px solid var(--line);
-}
-
-#weekSignal {
-  margin-top: 0.25rem;
-  color: var(--amber-bright);
-  font-family: var(--pixel);
-  font-size: 1.15rem;
-}
-
-.signal-kaufen #weekSignal { color: var(--green); }
-.signal-verkaufen #weekSignal { color: var(--red); }
-
 .week-counts {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--line);
 }
 
 .week-count {
@@ -635,6 +641,29 @@ input::placeholder { color: #756746; }
 .ranking-row.rank-buffer { border-left-color: var(--amber); }
 .ranking-row.rank-out { border-left-color: var(--red); }
 
+.sma-divider {
+  margin-top: 1rem;
+  border-top: 1px solid rgba(155, 137, 97, 0.5);
+  border-bottom: 1px solid rgba(155, 137, 97, 0.24);
+  padding: 0.65rem 0.75rem;
+  background: #161511;
+  color: #a69d88;
+  font-family: var(--pixel);
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ranking-row.rank-sma {
+  border-left-color: #756f62;
+  background: rgba(126, 120, 106, 0.09);
+}
+
+.ranking-row.rank-sma .rank,
+.ranking-row.rank-sma .ticker { color: #aaa18d; }
+
+.ranking-row.rank-sma .block-reason { color: #888172; }
+
 .rank {
   display: grid;
   width: auto;
@@ -684,6 +713,41 @@ input::placeholder { color: #756746; }
 .momentum-positive { color: var(--green); }
 .momentum-negative { color: var(--red); }
 .momentum-neutral { color: var(--muted); }
+
+.skeleton-row,
+.app.is-loading #statusCard {
+  animation: skeletonPulse 900ms steps(4, end) infinite;
+}
+
+.app.is-loading #statusCard .muted,
+.app.is-loading #statusCard .risk-status,
+.app.is-loading #statusCard small { color: var(--amber-dim); }
+
+.skeleton-line,
+.skeleton-score,
+.skeleton-row .rank {
+  height: 0.7rem;
+  background: var(--amber-dim);
+}
+
+.skeleton-line { width: min(70%, 13rem); }
+.skeleton-line.short { width: min(44%, 8rem); margin-top: 0.45rem; }
+.skeleton-score { width: 3.5rem; justify-self: end; }
+
+.load-error {
+  margin: 0 0 1rem;
+  border: 1px solid var(--red);
+  padding: 1rem;
+  background: rgba(217, 85, 63, 0.08);
+  color: var(--text);
+}
+
+.load-error p { margin-bottom: 0.8rem; color: var(--red); }
+.load-error[hidden] { display: none; }
+.app.load-failed #statusCard,
+.app.load-failed .section-title,
+.app.load-failed #rankingSearch,
+.app.load-failed #rankingList { display: none; }
 
 .ticker-form {
   display: grid;
@@ -839,7 +903,7 @@ input::placeholder { color: #756746; }
 
   .signal-layout { grid-template-columns: minmax(0, 1.35fr) minmax(108px, 0.65fr); }
   .signal-main { min-height: 7rem; padding: 0.9rem 0.75rem 0.9rem 1rem; }
-  .signal-main h2 { font-size: clamp(1.55rem, 9vw, 2.5rem); }
+  .signal-main h2 { font-size: clamp(1.25rem, 6.5vw, 1.8rem); white-space: nowrap; }
   .signal-main p { font-size: 0.62rem; }
   .risk-card { padding: 0.55rem 0.6rem; }
   .risk-topline { font-size: 0.57rem; }
@@ -866,8 +930,6 @@ input::placeholder { color: #756746; }
 
   .tab-button { min-height: 3.7rem; font-size: 0.56rem; }
   .tab-panel { padding: 0.7rem; }
-  .weekly-signal-row { grid-template-columns: 1fr; }
-  .weekly-signal-row > div:first-child { border-right: 0; border-bottom: 1px solid var(--line); }
   .week-count { min-height: 3.8rem; }
   .section-title { align-items: flex-end; }
 

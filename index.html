@@ -23,38 +23,7 @@
       </button>
     </section>
 
-    <main id="dashboard" class="app" inert>
-      <section id="statusCard" class="hero-card state-neutral">
-        <div class="signal-header">
-          <span class="label">Marktlage</span>
-          <span id="updatedAt" class="muted">—</span>
-        </div>
-        <div class="signal-layout">
-          <div class="signal-main">
-            <h2 id="mainSignal">Keine Daten</h2>
-            <p id="systemStatus">Bitte API-URL eintragen.</p>
-          </div>
-          <div class="risk-grid" aria-label="Volatilitätsfilter">
-            <div id="vixCard" class="risk-card risk-unknown">
-              <div class="risk-topline">
-                <span>VIX</span>
-                <strong id="latestVix">—</strong>
-              </div>
-              <span id="latestVixStatus" class="risk-status">Keine Daten</span>
-              <small id="latestVixLimits">OK ≤ 25 · STOP ≥ 30</small>
-            </div>
-            <div id="vxnCard" class="risk-card risk-unknown">
-              <div class="risk-topline">
-                <span>VXN</span>
-                <strong id="latestVxn">—</strong>
-              </div>
-              <span id="latestVxnStatus" class="risk-status">Keine Daten</span>
-              <small id="latestVxnLimits">OK ≤ 30 · STOP ≥ 35</small>
-            </div>
-          </div>
-        </div>
-      </section>
-
+    <main id="dashboard" class="app is-loading" inert>
       <nav class="tabs" aria-label="Bereiche">
         <button class="tab-button active" type="button" data-tab="cockpit">Cockpit</button>
         <button class="tab-button" type="button" data-tab="depot">Depot</button>
@@ -63,28 +32,49 @@
       </nav>
 
       <section id="tab-cockpit" class="tab-panel active">
-        <article id="weeklySummary" class="weekly-summary">
+        <article id="statusCard" class="hero-card weekly-summary state-neutral">
+          <div class="signal-header">
+            <span id="weekState" class="label">Aktuelle Woche</span>
+            <span id="updatedAt" class="muted">—</span>
+          </div>
           <div class="weekly-summary-header">
             <button id="previousWeekButton" class="week-nav-button" type="button" aria-label="Vorherige Woche">‹</button>
             <div class="week-heading">
-              <span id="weekState" class="label">Aktuelle Woche</span>
               <h2 id="weekTitle">—</h2>
               <span id="weekRange" class="muted">—</span>
             </div>
             <button id="nextWeekButton" class="week-nav-button" type="button" aria-label="Nächste Woche">›</button>
           </div>
-          <div class="weekly-signal-row">
-            <div>
-              <span class="label">Wochen-Signal</span>
-              <strong id="weekSignal">—</strong>
+          <div class="signal-layout">
+            <div class="signal-main">
+              <span class="label">Wochensignal</span>
+              <h2 id="mainSignal">—</h2>
+              <p>Tagesstand <strong id="dailySignal">—</strong></p>
             </div>
-            <div class="week-counts" aria-label="Signaltage dieser Woche">
-              <span class="week-count count-buy"><strong id="weekBuyDays">0</strong>Kaufen</span>
-              <span class="week-count count-wait"><strong id="weekWaitDays">0</strong>Warten</span>
-              <span class="week-count count-sell"><strong id="weekSellDays">0</strong>Verkaufen</span>
+            <div class="risk-grid" aria-label="Volatilitätsfilter">
+              <div id="vixCard" class="risk-card risk-unknown">
+                <div class="risk-topline"><span>VIX</span><strong id="latestVix">—</strong></div>
+                <span id="latestVixStatus" class="risk-status">—</span>
+                <small id="latestVixLimits">OK ≤ 25 · STOP ≥ 30</small>
+              </div>
+              <div id="vxnCard" class="risk-card risk-unknown">
+                <div class="risk-topline"><span>VXN</span><strong id="latestVxn">—</strong></div>
+                <span id="latestVxnStatus" class="risk-status">—</span>
+                <small id="latestVxnLimits">OK ≤ 30 · STOP ≥ 35</small>
+              </div>
             </div>
           </div>
+          <div class="week-counts" aria-label="Signaltage dieser Woche">
+            <span class="week-count count-buy"><strong id="weekBuyDays">—</strong>Kaufen</span>
+            <span class="week-count count-wait"><strong id="weekWaitDays">—</strong>Warten</span>
+            <span class="week-count count-sell"><strong id="weekSellDays">—</strong>Verkaufen</span>
+          </div>
         </article>
+
+        <div id="loadError" class="load-error" hidden>
+          <p id="loadErrorMessage">Daten konnten nicht geladen werden.</p>
+          <button id="retryLoadButton" class="primary-button" type="button">Erneut versuchen</button>
+        </div>
 
         <div class="section-title">
           <div>
