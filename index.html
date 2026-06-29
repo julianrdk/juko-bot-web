@@ -15,8 +15,15 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
     <script src="./app.js" defer></script>
   </head>
-  <body>
-    <main class="app">
+  <body class="is-locked">
+    <section id="lockScreen" class="lock-screen" aria-label="Zugangssperre">
+      <div id="moneyGrid" class="money-grid" aria-label="Musterfeld"></div>
+      <button id="unlockButton" class="unlock-button" type="button" aria-label="Muster prüfen">
+        <span aria-hidden="true"></span>
+      </button>
+    </section>
+
+    <main id="dashboard" class="app" inert>
       <section id="statusCard" class="hero-card state-neutral">
         <div class="signal-header">
           <span class="label">Marktlage</span>

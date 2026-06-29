@@ -49,6 +49,227 @@ body::after {
   );
 }
 
+body.is-locked { overflow: hidden; }
+
+body.is-locked .app {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.lock-screen {
+  position: fixed;
+  z-index: 500;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: clamp(1.4rem, 5vh, 2.8rem);
+  padding: max(1.25rem, env(safe-area-inset-top)) 1.25rem max(1.25rem, env(safe-area-inset-bottom));
+  background:
+    linear-gradient(rgba(255, 194, 71, 0.012) 1px, transparent 1px),
+    var(--bg);
+  background-size: 100% 4px;
+  transition: opacity 320ms steps(5, end);
+}
+
+.money-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(78px, 112px));
+  gap: clamp(0.65rem, 3vw, 1.3rem);
+}
+
+.money-node {
+  position: relative;
+  display: grid;
+  width: 100%;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.money-node:focus-visible {
+  outline: 1px solid var(--amber-bright);
+  outline-offset: -0.4rem;
+}
+
+.money-art {
+  position: relative;
+  display: block;
+  width: 64px;
+  height: 48px;
+  image-rendering: pixelated;
+  transform-origin: center bottom;
+  transition: transform 120ms steps(2, end), opacity 120ms steps(2, end);
+}
+
+.money-sheet {
+  position: absolute;
+  width: 52px;
+  height: 28px;
+  border: 3px solid var(--amber);
+  background: var(--panel);
+  box-shadow: inset 0 0 0 2px var(--amber-dim);
+}
+
+.money-sheet::before,
+.money-sheet::after {
+  position: absolute;
+  content: "";
+}
+
+.money-sheet::before {
+  top: 6px;
+  left: 18px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--amber-bright);
+}
+
+.money-sheet::after {
+  top: 4px;
+  right: 4px;
+  width: 4px;
+  height: 4px;
+  background: var(--amber-bright);
+  box-shadow: -38px 14px 0 var(--amber-bright);
+}
+
+.sheet-back { top: 0; left: 10px; }
+.sheet-middle { top: 7px; left: 5px; }
+.sheet-front { top: 14px; left: 0; }
+
+.money-band {
+  position: absolute;
+  z-index: 3;
+  top: 11px;
+  left: 24px;
+  width: 13px;
+  height: 34px;
+  border-right: 2px solid var(--panel);
+  border-left: 2px solid var(--panel);
+  background: var(--amber-bright);
+}
+
+.pixel-flame {
+  position: absolute;
+  z-index: 5;
+  display: none;
+  width: 6px;
+  height: 10px;
+  background: var(--red);
+  box-shadow:
+    0 -5px 0 var(--amber-bright),
+    5px 0 0 var(--amber),
+    -3px 5px 0 var(--amber-bright);
+  animation: pixelFlame 360ms steps(2, end) infinite alternate;
+}
+
+.flame-one { right: 3px; bottom: 5px; }
+.flame-two { right: 17px; bottom: 0; animation-delay: 120ms; }
+
+.ash-pile {
+  position: absolute;
+  bottom: 1px;
+  left: 12px;
+  display: none;
+  width: 40px;
+  height: 5px;
+  background: #594b32;
+  box-shadow:
+    6px -4px 0 #756746,
+    17px -2px 0 #8d7340,
+    26px -5px 0 #594b32,
+    33px -2px 0 #756746;
+}
+
+.stage-1 .money-art { transform: scale(0.76); }
+.stage-1 .pixel-flame,
+.stage-2 .pixel-flame { display: block; }
+
+.stage-2 .money-art { transform: scale(0.84); }
+.stage-2 .sheet-back,
+.stage-2 .sheet-middle,
+.stage-2 .money-band { display: none; }
+.stage-2 .sheet-front { top: 10px; left: 6px; transform: rotate(-4deg); }
+
+.stage-3 .money-sheet,
+.stage-3 .money-band,
+.stage-3 .pixel-flame { display: none; }
+.stage-3 .ash-pile { display: block; }
+
+.unlock-button {
+  position: relative;
+  display: grid;
+  width: 50px;
+  height: 50px;
+  place-self: center;
+  place-items: center;
+  border: 1px solid var(--amber);
+  border-radius: 0;
+  background: var(--panel);
+  color: var(--amber-bright);
+}
+
+.unlock-button span {
+  position: relative;
+  width: 18px;
+  height: 3px;
+  background: currentColor;
+}
+
+.unlock-button span::before,
+.unlock-button span::after {
+  position: absolute;
+  right: -1px;
+  width: 10px;
+  height: 3px;
+  content: "";
+  background: currentColor;
+  transform-origin: right center;
+}
+
+.unlock-button span::before { top: -1px; transform: rotate(45deg); }
+.unlock-button span::after { bottom: -1px; transform: rotate(-45deg); }
+
+.unlock-button:not(:disabled):active {
+  background: var(--amber);
+  color: var(--bg);
+}
+
+.lock-error { animation: lockError 420ms steps(2, end); }
+.lock-error .unlock-button { border-color: var(--red); color: var(--red); }
+
+.lock-success { opacity: 0; }
+.lock-success .money-node { pointer-events: none; }
+.final-burn .ash-pile { animation: ashDrop 420ms steps(4, end) both; }
+
+body.is-unlocked .app {
+  animation: dashboardReveal 360ms steps(5, end) both;
+}
+
+@keyframes pixelFlame {
+  from { transform: translate(0, 0) scaleY(0.85); }
+  to { transform: translate(-2px, -3px) scaleY(1.1); }
+}
+
+@keyframes lockError {
+  0%, 100% { background-color: var(--bg); }
+  35%, 65% { background-color: #210b08; }
+}
+
+@keyframes ashDrop {
+  from { opacity: 0; transform: translateY(-8px) scaleX(0.4); }
+  to { opacity: 1; transform: translateY(0) scaleX(1); }
+}
+
+@keyframes dashboardReveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 button,
 input { font: inherit; }
 
@@ -648,6 +869,17 @@ input::placeholder { color: #756746; }
   .chart-viewport-main { height: 320px; }
   .chart-viewport-signal { height: 240px; }
   .chart-viewport-risk { height: 280px; }
+}
+
+@media (max-width: 370px) {
+  .money-grid {
+    grid-template-columns: repeat(3, minmax(72px, 92px));
+    gap: 0.45rem;
+  }
+
+  .money-art { transform: scale(0.88); }
+  .stage-1 .money-art { transform: scale(0.7); }
+  .stage-2 .money-art { transform: scale(0.76); }
 }
 
 @media (max-width: 370px) {

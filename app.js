@@ -4,6 +4,8 @@ const STORAGE_KEYS = {
   chartDays: 'juko_v2_chart_days',
 };
 
+const PUBLIC_API_URL = 'https://script.google.com/macros/s/AKfycbwPuSxd_GqUrJCTh78W37o2QELsFAWRoIuj4L7yTQ1oAN5ofUJ3u6hv-vZJ0tE6Y8L-kA/exec';
+
 const sampleData = {
   updatedAt: new Date().toISOString(),
   config: { vixOk: 25, vixStop: 30, vxnOk: 30, vxnStop: 35 },
@@ -58,9 +60,16 @@ let selectedWeekIndex = -1;
 let selectedDepotTicker = '';
 let activeSuggestionIndex = -1;
 let tickerSuggestions = [];
+let lockSequence = [];
+let dashboardInitialized = false;
+let lockRequestPending = false;
 
 function getApiUrl() {
-  return localStorage.getItem(STORAGE_KEYS.apiUrl) || '';
+  return localStorage.getItem(STORAGE_KEYS.apiUrl) || PUBLIC_API_URL;
+}
+
+function getLockApiUrl() {
+  return PUBLIC_API_URL || localStorage.getItem(STORAGE_KEYS.apiUrl) || '';
 }
 
 function getApiToken() {
@@ -651,6 +660,129 @@ function formatShortDate(value) {
   return new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit' }).format(new Date(value));
 }
 
+function initializeLockScreen() {
+  const grid = document.querySelector('#moneyGrid');
+  grid.innerHTML = '';
+  for (let position = 1; position <= 9; position += 1) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'money-node stage-0';
+    button.dataset.position = String(position);
+    button.dataset.stage = '0';
+    button.setAttribute('aria-label', `Position ${position}`);
+    button.innerHTML = `
+      <span class="money-art" aria-hidden="true">
+        <span class="money-sheet sheet-back"></span>
+        <span class="money-sheet sheet-middle"></span>
+        <span class="money-sheet sheet-front"></span>
+        <span class="money-band"></span>
+        <span class="pixel-flame flame-one"></span>
+        <span class="pixel-flame flame-two"></span>
+        <span class="ash-pile"></span>
+      </span>
+    `;
+    grid.append(button);
+  }
+
+  grid.addEventListener('click', event => {
+    const node = event.target.closest('.money-node');
+    if (!node || lockRequestPending) return;
+    registerLockTap(node);
+  });
+
+  document.querySelector('#unlockButton').addEventListener('click', verifyLockSequence);
+}
+
+function registerLockTap(node) {
+  lockSequence.push(Number(node.dataset.position));
+  const currentStage = Number(node.dataset.stage || 0);
+  const nextStage = Math.min(3, currentStage + 1);
+  node.dataset.stage = String(nextStage);
+  node.className = `money-node stage-${nextStage}`;
+}
+
+async function verifyLockSequence() {
+  if (lockRequestPending) return;
+  lockRequestPending = true;
+  const button = document.querySelector('#unlockButton');
+  button.disabled = true;
+
+  try {
+    const apiUrl = getLockApiUrl();
+    if (!apiUrl) throw new Error('Lock-API fehlt');
+    const patternHash = await sha256Hex(lockSequence.join(','));
+    const payload = await loadJsonp(apiUrl, { action: 'verifyLock', patternHash });
+    if (!payload.ok || !payload.result?.unlocked) {
+      resetLockScreen(true);
+      return;
+    }
+    await playUnlockAnimation();
+    unlockDashboard();
+  } catch (error) {
+    resetLockScreen(true);
+  } finally {
+    lockRequestPending = false;
+    button.disabled = false;
+  }
+}
+
+async function sha256Hex(value) {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function resetLockScreen(showError) {
+  const screen = document.querySelector('#lockScreen');
+  if (showError) {
+    screen.classList.remove('lock-error');
+    void screen.offsetWidth;
+    screen.classList.add('lock-error');
+  }
+  window.setTimeout(() => {
+    lockSequence = [];
+    document.querySelectorAll('.money-node').forEach(node => {
+      node.dataset.stage = '0';
+      node.className = 'money-node stage-0';
+    });
+    screen.classList.remove('lock-error');
+  }, showError ? 420 : 0);
+}
+
+function playUnlockAnimation() {
+  const screen = document.querySelector('#lockScreen');
+  screen.classList.add('lock-success');
+  document.querySelectorAll('.money-node').forEach((node, index) => {
+    window.setTimeout(() => {
+      node.dataset.stage = '3';
+      node.className = 'money-node stage-3 final-burn';
+    }, index * 45);
+  });
+  return new Promise(resolve => window.setTimeout(resolve, 760));
+}
+
+function unlockDashboard() {
+  const dashboard = document.querySelector('#dashboard');
+  document.body.classList.remove('is-locked');
+  document.body.classList.add('is-unlocked');
+  dashboard.removeAttribute('inert');
+  window.setTimeout(() => {
+    document.querySelector('#lockScreen').hidden = true;
+  }, 360);
+  initializeDashboard();
+}
+
+function initializeDashboard() {
+  if (dashboardInitialized) return;
+  dashboardInitialized = true;
+  bindEvents();
+  readApi().catch(error => {
+    currentData = sampleData;
+    render(sampleData);
+    setError(error.message);
+  });
+}
+
 function bindEvents() {
   document.querySelectorAll('.tab-button').forEach(button => {
     button.addEventListener('click', () => {
@@ -754,9 +886,4 @@ function bindEvents() {
   });
 }
 
-bindEvents();
-readApi().catch(error => {
-  currentData = sampleData;
-  render(sampleData);
-  setError(error.message);
-});
+initializeLockScreen();
