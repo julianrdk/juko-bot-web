@@ -11,14 +11,6 @@
   </head>
   <body>
     <main class="app">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">Juko Bot v2</p>
-          <h1>Signal-Dashboard</h1>
-        </div>
-        <button id="refreshButton" class="icon-button" type="button" aria-label="Aktualisieren">↻</button>
-      </header>
-
       <section id="statusCard" class="hero-card state-neutral">
         <div class="signal-header">
           <span class="label">Marktlage</span>
@@ -79,9 +71,6 @@
               <span class="week-count count-sell"><strong id="weekSellDays">0</strong>Verkaufen</span>
             </div>
           </div>
-          <p class="weekly-execution-note">
-            Verkauf: Freitagabend · Kauf: Montagvormittag der Folgewoche
-          </p>
         </article>
 
         <div class="section-title">
@@ -91,7 +80,6 @@
           </div>
           <span id="signalCount" class="muted">—</span>
         </div>
-        <p class="muted small">Grün = Top 10, Gelb = Puffer Rang 11–12 oder gesperrt, Rot = darunter.</p>
         <input id="rankingSearch" class="search-input" type="search" placeholder="Ticker oder Name suchen" />
         <div id="rankingList" class="ranking-table"></div>
       </section>
@@ -104,8 +92,21 @@
           </div>
         </div>
         <form id="addTickerForm" class="ticker-form">
-          <input id="tickerInput" type="text" autocomplete="off" placeholder="z. B. NASDAQ:AMD" />
-          <button class="primary-button" type="submit">Hinzufügen</button>
+          <div class="ticker-autocomplete">
+            <label class="sr-only" for="tickerInput">Aktie suchen</label>
+            <input
+              id="tickerInput"
+              type="search"
+              autocomplete="off"
+              placeholder="Ticker oder Name suchen"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded="false"
+              aria-controls="tickerSuggestions"
+            />
+            <div id="tickerSuggestions" class="ticker-suggestions" role="listbox" hidden></div>
+          </div>
+          <button id="addTickerButton" class="primary-button" type="submit" disabled>Hinzufügen</button>
         </form>
         <p class="muted small">Rang 13+ wird beobachtet. Nach 14 Tagen außerhalb Top 12 erscheint KICKEN.</p>
         <div id="depotList" class="decision-list"></div>
@@ -131,28 +132,28 @@
             <h2>Nasdaq Signal</h2>
             <span class="muted">Kurs, SMA200, Kauf-/Verkaufslinie</span>
           </div>
-          <canvas id="nasdaqChart"></canvas>
+          <div class="chart-viewport chart-viewport-main"><canvas id="nasdaqChart"></canvas></div>
         </article>
         <article class="chart-card">
           <div class="section-title compact">
             <h2>Tages-Signale</h2>
             <span class="muted">Kaufen, Warten und Verkaufen im gewählten Zeitraum</span>
           </div>
-          <canvas id="signalHistoryChart"></canvas>
+          <div class="chart-viewport chart-viewport-signal"><canvas id="signalHistoryChart"></canvas></div>
         </article>
         <article class="chart-card">
           <div class="section-title compact">
             <h2>VIX</h2>
             <span class="muted">OK/STOP-Zonen</span>
           </div>
-          <canvas id="vixChart"></canvas>
+          <div class="chart-viewport chart-viewport-risk"><canvas id="vixChart"></canvas></div>
         </article>
         <article class="chart-card">
           <div class="section-title compact">
             <h2>VXN</h2>
             <span class="muted">OK/STOP-Zonen</span>
           </div>
-          <canvas id="vxnChart"></canvas>
+          <div class="chart-viewport chart-viewport-risk"><canvas id="vxnChart"></canvas></div>
         </article>
       </section>
 
