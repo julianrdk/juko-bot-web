@@ -55,9 +55,6 @@ let currentData = sampleData;
 let charts = {};
 let weeklySummaries = [];
 let selectedWeekIndex = -1;
-let selectedDepotTicker = '';
-let activeSuggestionIndex = -1;
-let tickerSuggestions = [];
 
 function getApiUrl() {
   return localStorage.getItem(STORAGE_KEYS.apiUrl) || '';
@@ -129,7 +126,7 @@ function render(data) {
   renderDepot(data.depot || []);
   renderRanking(data.signals || []);
   renderWeeklySummary(data.charts?.history || []);
-  if (document.querySelector('#tab-charts').classList.contains('active')) renderCharts(data);
+  renderCharts(data);
 }
 
 function renderSettings() {
@@ -183,24 +180,14 @@ function renderDepot(items) {
     return;
   }
 
-  [...items]
-    .sort(compareDepotRows)
-    .forEach(item => {
+  items.forEach(item => {
     const action = String(item.action || 'PRÜFEN').toLowerCase();
-    const rank = Number(item.rank);
-    const hasRank = hasNumericRank(item.rank);
-    const isOutsideTop12 = !hasRank || rank > 12;
-    const details = [
-      `Rang ${hasRank ? rank : 'nicht Top'}`,
-      `Hinzugefügt seit ${formatDate(item.capturedSince)}`,
-    ];
-    if (isOutsideTop12) details.push(`${item.daysOutsideTop12 || 0} Tage außerhalb Top 12`);
     const div = document.createElement('div');
     div.className = 'decision-item';
     div.innerHTML = `
       <div>
         <div class="ticker">${item.ticker}</div>
-        <div class="subtext depot-meta">${details.map(detail => `<span>${detail}</span>`).join('')}</div>
+        <div class="subtext">Rang ${item.rank ?? 'nicht Top'} · ${item.daysOutsideTop12 || 0} Tage außerhalb Top 12</div>
       </div>
       <span class="badge badge-${action}">${item.action || 'PRÜFEN'}</span>
       <button class="remove-button" type="button" data-ticker="${item.ticker}">×</button>
@@ -209,139 +196,46 @@ function renderDepot(items) {
   });
 }
 
-function compareDepotRows(left, right) {
-  const leftRank = hasNumericRank(left.rank) ? Number(left.rank) : Number.POSITIVE_INFINITY;
-  const rightRank = hasNumericRank(right.rank) ? Number(right.rank) : Number.POSITIVE_INFINITY;
-  return leftRank - rightRank || String(left.ticker).localeCompare(String(right.ticker));
-}
-
-function updateTickerSuggestions(query) {
-  selectedDepotTicker = '';
-  activeSuggestionIndex = -1;
-  document.querySelector('#addTickerButton').disabled = true;
-  const normalizedQuery = String(query || '').trim().toUpperCase();
-  const depotTickers = new Set((currentData.depot || []).map(item => String(item.ticker)));
-  tickerSuggestions = normalizedQuery
-    ? (currentData.signals || [])
-      .filter(item => !item.isMarketTicker && !depotTickers.has(item.ticker))
-      .filter(item => item.ticker.includes(normalizedQuery) || String(item.name || '').toUpperCase().includes(normalizedQuery))
-      .sort((left, right) => compareTickerSuggestion(left, right, normalizedQuery))
-      .slice(0, 6)
-    : [];
-  renderTickerSuggestions();
-}
-
-function compareTickerSuggestion(left, right, query) {
-  const leftSymbol = String(left.ticker).split(':').pop();
-  const rightSymbol = String(right.ticker).split(':').pop();
-  const leftStarts = leftSymbol.startsWith(query) || String(left.name || '').toUpperCase().startsWith(query);
-  const rightStarts = rightSymbol.startsWith(query) || String(right.name || '').toUpperCase().startsWith(query);
-  if (leftStarts !== rightStarts) return leftStarts ? -1 : 1;
-  return leftSymbol.localeCompare(rightSymbol);
-}
-
-function renderTickerSuggestions() {
-  const input = document.querySelector('#tickerInput');
-  const list = document.querySelector('#tickerSuggestions');
-  list.innerHTML = '';
-  list.hidden = tickerSuggestions.length === 0;
-  input.setAttribute('aria-expanded', String(tickerSuggestions.length > 0));
-  tickerSuggestions.forEach((item, index) => {
-    const option = document.createElement('button');
-    option.type = 'button';
-    option.className = `ticker-suggestion${index === activeSuggestionIndex ? ' active' : ''}`;
-    option.dataset.ticker = item.ticker;
-    option.setAttribute('role', 'option');
-    option.setAttribute('aria-selected', String(index === activeSuggestionIndex));
-    option.innerHTML = `<strong>${item.ticker}</strong><span class="ticker-suggestion-name">${item.name || '—'}</span>`;
-    list.append(option);
-  });
-}
-
-function selectTickerSuggestion(index) {
-  const item = tickerSuggestions[index];
-  if (!item) return;
-  selectedDepotTicker = item.ticker;
-  activeSuggestionIndex = index;
-  const input = document.querySelector('#tickerInput');
-  input.value = `${item.ticker} · ${item.name || ''}`.trim();
-  input.setAttribute('aria-expanded', 'false');
-  document.querySelector('#tickerSuggestions').hidden = true;
-  document.querySelector('#addTickerButton').disabled = false;
-}
-
-function moveActiveTickerSuggestion(direction) {
-  if (!tickerSuggestions.length) return;
-  activeSuggestionIndex = Math.max(0, Math.min(tickerSuggestions.length - 1, activeSuggestionIndex + direction));
-  renderTickerSuggestions();
-}
-
 function renderRanking(items) {
   const query = document.querySelector('#rankingSearch').value.trim().toUpperCase();
   const list = document.querySelector('#rankingList');
   list.innerHTML = '';
 
-  buildDisplayRanking(items)
+  items
+    .filter(item => !item.isMarketTicker)
     .filter(item => !query || item.ticker.includes(query) || (item.name || '').toUpperCase().includes(query))
+    .sort(compareSignalRows)
     .forEach(item => {
+      const status = String(item.signal || 'UNBEKANNT');
+      const badgeClass = status.toLowerCase();
       const momentum = item.momentumAdjusted ?? item.momentum90;
-      const blockReason = getBlockReason(item);
       const div = document.createElement('div');
-      div.className = `ranking-row ${getRankZoneClass(item.rank)}`;
+      div.className = `ranking-row ${getRankZoneClass(item.rank, status)}`;
       div.innerHTML = `
-        <span class="rank">${item.displayRank}</span>
+        <span class="rank">${item.rank ?? '—'}</span>
         <div>
           <div class="ticker">${item.ticker}</div>
           <div class="subtext">${item.name || '—'} · ${formatCurrency(item.price)}</div>
-          ${blockReason ? `<div class="block-reason">${blockReason}</div>` : ''}
         </div>
-        <div class="score ${getMomentumClass(momentum)}">${formatPercent(momentum)}</div>
+        <span class="badge badge-${badgeClass}">${status}</span>
+        <div class="score">${formatPercent(momentum)}</div>
       `;
       list.append(div);
     });
 }
 
-function buildDisplayRanking(items) {
-  const stocks = items.filter(item => !item.isMarketTicker);
-  const ranked = stocks
-    .filter(item => hasNumericRank(item.rank))
-    .sort((left, right) => Number(left.rank) - Number(right.rank));
-  const blocked = stocks
-    .filter(item => !hasNumericRank(item.rank))
-    .sort(compareMomentumDescending);
-  return ranked.concat(blocked).map((item, index) => ({ ...item, displayRank: index + 1 }));
+function compareSignalRows(left, right) {
+  if (left.rank && right.rank) return left.rank - right.rank;
+  if (left.rank) return -1;
+  if (right.rank) return 1;
+  return String(left.ticker).localeCompare(String(right.ticker));
 }
 
-function compareMomentumDescending(left, right) {
-  const leftMomentum = Number(left.momentumAdjusted ?? left.momentum90);
-  const rightMomentum = Number(right.momentumAdjusted ?? right.momentum90);
-  const safeLeft = Number.isFinite(leftMomentum) ? leftMomentum : Number.NEGATIVE_INFINITY;
-  const safeRight = Number.isFinite(rightMomentum) ? rightMomentum : Number.NEGATIVE_INFINITY;
-  return safeRight - safeLeft || String(left.ticker).localeCompare(String(right.ticker));
-}
-
-function getBlockReason(item) {
-  if (item.anomaly || item.signal === 'ANOMALIE') return 'Anomalie';
-  if (item.price === null || item.sma200 === null || (item.momentumAdjusted ?? item.momentum90) === null) return 'Keine Daten';
-  if (item.signal === 'GESPERRT' || item.aboveSma === false) return 'Unter SMA200';
-  return hasNumericRank(item.rank) ? '' : 'Nicht kaufbar';
-}
-
-function getRankZoneClass(rank) {
-  if (!hasNumericRank(rank)) return 'rank-out';
-  if (Number(rank) <= 10) return 'rank-buy';
-  if (Number(rank) <= 12) return 'rank-buffer';
-  return 'rank-out';
-}
-
-function hasNumericRank(rank) {
-  return rank !== null && rank !== '' && rank !== undefined && Number.isFinite(Number(rank));
-}
-
-function getMomentumClass(momentum) {
-  const value = Number(momentum);
-  if (!Number.isFinite(value) || value === 0) return 'momentum-neutral';
-  return value > 0 ? 'momentum-positive' : 'momentum-negative';
+function getRankZoneClass(rank, signal) {
+  if (rank <= 10) return 'rank-buy';
+  if (rank <= 12) return 'rank-buffer';
+  if (signal === 'KAUFEN') return 'rank-out';
+  return 'rank-neutral';
 }
 function renderWeeklySummary(history) {
   weeklySummaries = buildWeeklySummaries(history);
@@ -587,7 +481,7 @@ function replaceChart(existing, canvasId, config) {
     ...config,
     options: {
       responsive: true,
-      maintainAspectRatio: false,
+      maintainAspectRatio: true,
       ...customOptions,
       plugins: {
         legend: { labels: { color: '#dbe7f7' } },
@@ -596,11 +490,7 @@ function replaceChart(existing, canvasId, config) {
       scales: {
         x: {
           ...customScales.x,
-          ticks: {
-            color: '#91a4bd',
-            maxTicksLimit: window.matchMedia('(max-width: 560px)').matches ? 5 : 8,
-            ...(customScales.x?.ticks || {}),
-          },
+          ticks: { color: '#91a4bd', maxTicksLimit: 8, ...(customScales.x?.ticks || {}) },
           grid: { color: 'rgba(255,255,255,0.06)', ...(customScales.x?.grid || {}) },
         },
         y: {
@@ -615,11 +505,7 @@ function replaceChart(existing, canvasId, config) {
 
 function formatPercent(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
-  return new Intl.NumberFormat('de-DE', {
-    style: 'percent',
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  }).format(Number(value));
+  return new Intl.NumberFormat('de-DE', { style: 'percent', maximumFractionDigits: 1 }).format(Number(value));
 }
 
 function formatNumber(value) {
@@ -636,17 +522,6 @@ function formatDateTime(value) {
   return new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
 }
 
-function formatDate(value) {
-  if (!value) return 'unbekannt';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'unbekannt';
-  return new Intl.DateTimeFormat('de-DE', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(date);
-}
-
 function formatShortDate(value) {
   return new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit' }).format(new Date(value));
 }
@@ -658,9 +533,6 @@ function bindEvents() {
       document.querySelectorAll('.tab-panel').forEach(item => item.classList.remove('active'));
       button.classList.add('active');
       document.querySelector(`#tab-${button.dataset.tab}`).classList.add('active');
-      if (button.dataset.tab === 'charts') {
-        requestAnimationFrame(() => renderCharts(currentData));
-      }
     });
   });
 
@@ -676,53 +548,18 @@ function bindEvents() {
     readApi().catch(error => setError(error.message));
   });
 
+  document.querySelector('#refreshButton').addEventListener('click', () => {
+    readApi().catch(error => setError(error.message));
+  });
+
   document.querySelector('#addTickerForm').addEventListener('submit', event => {
     event.preventDefault();
     const input = document.querySelector('#tickerInput');
-    if (!selectedDepotTicker) return;
-    mutateDepot('addTicker', selectedDepotTicker)
-      .then(() => {
-        input.value = '';
-        selectedDepotTicker = '';
-        tickerSuggestions = [];
-        document.querySelector('#addTickerButton').disabled = true;
-        renderTickerSuggestions();
-      })
+    const ticker = input.value.trim().toUpperCase();
+    if (!ticker) return;
+    mutateDepot('addTicker', ticker)
+      .then(() => { input.value = ''; })
       .catch(error => setError(error.message));
-  });
-
-  document.querySelector('#tickerInput').addEventListener('input', event => {
-    updateTickerSuggestions(event.target.value);
-  });
-
-  document.querySelector('#tickerInput').addEventListener('keydown', event => {
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      moveActiveTickerSuggestion(1);
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      moveActiveTickerSuggestion(-1);
-    } else if (event.key === 'Enter' && activeSuggestionIndex >= 0 && !selectedDepotTicker) {
-      event.preventDefault();
-      selectTickerSuggestion(activeSuggestionIndex);
-    } else if (event.key === 'Escape') {
-      tickerSuggestions = [];
-      renderTickerSuggestions();
-    }
-  });
-
-  document.querySelector('#tickerSuggestions').addEventListener('pointerdown', event => {
-    const option = event.target.closest('[data-ticker]');
-    if (!option) return;
-    event.preventDefault();
-    const index = tickerSuggestions.findIndex(item => item.ticker === option.dataset.ticker);
-    selectTickerSuggestion(index);
-  });
-
-  document.addEventListener('pointerdown', event => {
-    if (event.target.closest('.ticker-autocomplete')) return;
-    tickerSuggestions = [];
-    renderTickerSuggestions();
   });
 
   document.querySelector('#depotList').addEventListener('click', event => {

@@ -34,6 +34,7 @@ body {
   padding: max(1rem, env(safe-area-inset-top)) 1rem 2rem;
 }
 
+.topbar,
 .section-title,
 .button-row,
 .tabs {
@@ -41,20 +42,32 @@ body {
   gap: 0.8rem;
 }
 
+.topbar,
 .section-title {
   align-items: center;
   justify-content: space-between;
 }
 
+.topbar {
+  padding: 0.8rem 0 1rem;
+}
+
+h1,
 h2,
 p {
   margin: 0;
+}
+
+h1 {
+  font-size: clamp(1.8rem, 6vw, 2.7rem);
+  letter-spacing: -0.03em;
 }
 
 h2 {
   font-size: 1.15rem;
 }
 
+.eyebrow,
 .label {
   margin-bottom: 0.2rem;
   color: var(--muted);
@@ -428,6 +441,12 @@ button {
   border-color: var(--red);
 }
 
+.weekly-execution-note {
+  margin-top: 0.75rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
 .decision-list,
 .ranking-table {
   display: grid;
@@ -440,7 +459,7 @@ button {
 .decision-item,
 .ranking-row {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
   gap: 0.8rem;
   align-items: center;
   padding: 0.9rem;
@@ -510,18 +529,6 @@ button {
   font-size: 0.83rem;
 }
 
-.block-reason {
-  display: block;
-  margin-top: 0.2rem;
-  color: var(--red);
-  font-size: 0.72rem;
-  font-weight: 750;
-}
-
-.momentum-positive { color: var(--green); }
-.momentum-negative { color: var(--red); }
-.momentum-neutral { color: var(--muted); }
-
 .score,
 .badge {
   font-weight: 900;
@@ -532,50 +539,6 @@ button {
   grid-template-columns: 1fr auto;
   gap: 0.7rem;
   margin-top: 1rem;
-}
-
-.ticker-autocomplete { position: relative; }
-
-.ticker-suggestions {
-  position: absolute;
-  z-index: 20;
-  top: calc(100% + 0.35rem);
-  right: 0;
-  left: 0;
-  display: grid;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 0.9rem;
-  background: #132238;
-  box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.35);
-}
-
-.ticker-suggestions:empty { display: none; }
-
-.ticker-suggestion {
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  padding: 0.75rem;
-  background: transparent;
-  color: var(--text);
-  text-align: left;
-}
-
-.ticker-suggestion:last-child { border-bottom: 0; }
-.ticker-suggestion:hover,
-.ticker-suggestion.active { background: rgba(115, 167, 255, 0.16); }
-
-.ticker-suggestion-name {
-  display: block;
-  margin-top: 0.12rem;
-  color: var(--muted);
-  font-size: 0.78rem;
-}
-
-.depot-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 0.75rem;
 }
 
 .decision-item {
@@ -595,6 +558,22 @@ button {
   border-radius: 999px;
   padding: 0.45rem 0.65rem;
   font-size: 0.72rem;
+}
+
+.badge-kaufen {
+  background: rgba(53, 208, 143, 0.14);
+  color: var(--green);
+}
+
+.badge-gesperrt {
+  background: rgba(247, 201, 72, 0.15);
+  color: var(--yellow);
+}
+
+.badge-anomalie,
+.badge-unbekannt {
+  background: rgba(239, 83, 80, 0.16);
+  color: var(--red);
 }
 
 .badge-halten {
@@ -662,33 +641,10 @@ button {
   gap: 0.2rem;
 }
 
-.chart-viewport {
-  position: relative;
+canvas {
   width: 100%;
+  max-height: 320px;
   margin-top: 1rem;
-}
-
-.chart-viewport-main { height: 380px; }
-.chart-viewport-signal { height: 280px; }
-.chart-viewport-risk { height: 320px; }
-
-.chart-viewport canvas {
-  width: 100% !important;
-  height: 100% !important;
-}
-
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
 }
 
 .metric-grid {
@@ -711,6 +667,7 @@ button:disabled {
 }
 
 @media (max-width: 560px) {
+  .topbar,
   .section-title {
     align-items: flex-start;
     flex-direction: column;
@@ -754,8 +711,4 @@ button:disabled {
   .decision-item {
     grid-template-columns: 1fr auto;
   }
-
-  .chart-viewport-main { height: 320px; }
-  .chart-viewport-signal { height: 240px; }
-  .chart-viewport-risk { height: 280px; }
 }
