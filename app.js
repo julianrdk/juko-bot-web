@@ -67,8 +67,7 @@ let lockRequestPending = false;
 let apiSessionToken = '';
 
 function getApiUrl() {
-  const storedUrl = localStorage.getItem(STORAGE_KEYS.apiUrl) || '';
-  return isAllowedApiUrl(storedUrl) ? storedUrl : PUBLIC_API_URL;
+  return PUBLIC_API_URL;
 }
 
 function getLockApiUrl() {
@@ -184,14 +183,15 @@ async function mutateDepot(action, ticker) {
 function render(data) {
   renderSettings();
   renderDepot(data.depot || []);
-  renderRanking(data.signals || []);
   renderWeeklySummary(data.charts?.history || []);
   if (document.querySelector('#tab-charts').classList.contains('active')) renderCharts(data);
 }
 
 function renderSettings() {
-  document.querySelector('#apiUrlInput').value = getApiUrl();
   document.querySelector('#apiTokenInput').value = getApiToken();
+  const status = document.querySelector('#apiConnectionStatus');
+  status.textContent = apiSessionToken ? 'API verbunden' : 'Nicht verbunden';
+  status.classList.toggle('connected', Boolean(apiSessionToken));
 }
 
 function renderRiskCard(prefix, value, okLimit, stopLimit) {
@@ -324,15 +324,22 @@ function getGoogleFinanceUrl(ticker) {
   return `https://www.google.com/finance/quote/${encodeURIComponent(symbol)}:${encodeURIComponent(exchange)}`;
 }
 
-function renderRanking(items) {
+function renderRanking(items, previousItems = []) {
   const query = document.querySelector('#rankingSearch').value.trim().toUpperCase();
   const list = document.querySelector('#rankingList');
   list.innerHTML = '';
 
+  const displayItems = items.some(item => item.displayRank) ? items : buildDisplayRanking(items);
+  const previousRanks = new Map(previousItems.map(item => [item.ticker, Number(item.displayRank)]));
+  const filteredItems = displayItems
+    .filter(item => !query || item.ticker.includes(query) || (item.name || '').toUpperCase().includes(query));
+  if (!filteredItems.length) {
+    list.innerHTML = `<p class="ranking-empty muted">${displayItems.length ? 'Keine Treffer' : 'Für diese Woche wurde noch kein Ranking gespeichert.'}</p>`;
+    return;
+  }
+
   let smaDividerRendered = false;
-  buildDisplayRanking(items)
-    .filter(item => !query || item.ticker.includes(query) || (item.name || '').toUpperCase().includes(query))
-    .forEach(item => {
+  filteredItems.forEach(item => {
       if (item.displayGroup === 'sma' && !smaDividerRendered) {
         const divider = document.createElement('div');
         divider.className = 'sma-divider';
@@ -345,14 +352,18 @@ function renderRanking(items) {
       const div = document.createElement('div');
       div.className = `ranking-row ${item.displayGroup === 'sma' ? 'rank-sma' : getRankZoneClass(item.rank)}`;
       const quoteUrl = getGoogleFinanceUrl(item.ticker);
+      const previousRank = previousRanks.get(item.ticker);
+      const movement = previousRank ? previousRank - Number(item.displayRank) : null;
+      const movementLabel = movement === null ? 'NEU' : movement > 0 ? `▲${movement}` : movement < 0 ? `▼${Math.abs(movement)}` : '—';
+      const movementClass = movement > 0 ? 'movement-up' : movement < 0 ? 'movement-down' : 'movement-neutral';
       div.innerHTML = `
-        <span class="rank">${item.displayRank}</span>
-        <div>
+        <span class="rank"><strong>${item.displayRank}</strong><small class="${movementClass}">${movementLabel}</small></span>
+        <div class="stock-details">
           <div class="ticker">${escapeHtml(item.ticker)}</div>
-          <div class="subtext">${escapeHtml(item.name || '—')} · ${escapeHtml(formatCurrency(item.price))}</div>
+          <div class="subtext stock-name">${escapeHtml(item.name || '—')} · ${escapeHtml(formatCurrency(item.price))}</div>
           ${blockReason ? `<div class="block-reason">${escapeHtml(blockReason)}</div>` : ''}
         </div>
-        <div class="score ${getMomentumClass(momentum)}">${formatPercent(momentum)}</div>
+        <div class="score"><strong class="${getMomentumClass(momentum)}">${formatPercent(momentum)}</strong><small class="${getMomentumClass(item.growth7d)}">7T ${formatPercent(item.growth7d)}</small></div>
       `;
       if (quoteUrl) {
         const quoteLink = document.createElement('a');
@@ -402,6 +413,7 @@ function compareMomentumDescending(left, right) {
 }
 
 function getBlockReason(item) {
+  if (item.blockReason) return item.blockReason;
   if (item.anomaly || item.signal === 'ANOMALIE') return 'Anomalie';
   if (item.price === null || item.sma200 === null || (item.momentumAdjusted ?? item.momentum90) === null) return 'Keine Daten';
   if (item.signal === 'GESPERRT' || item.aboveSma === false) return 'Unter SMA200';
@@ -502,6 +514,20 @@ function renderSelectedWeek() {
 
   document.querySelector('#previousWeekButton').disabled = selectedWeekIndex === 0;
   document.querySelector('#nextWeekButton').disabled = selectedWeekIndex === weeklySummaries.length - 1;
+  renderSelectedWeekRanking(week.key, isArchive);
+}
+
+function renderSelectedWeekRanking(weekKey, isArchive) {
+  const storedWeeks = currentData.rankingWeeks || [];
+  const currentWeekKey = getIsoWeekInfo(new Date()).key;
+  const selectedStoredIndex = storedWeeks.findIndex(week => week.key === weekKey);
+  const previousWeek = selectedStoredIndex > 0 ? storedWeeks[selectedStoredIndex - 1] : null;
+  if (!isArchive && weekKey === currentWeekKey) {
+    const comparison = [...storedWeeks].reverse().find(week => week.key < currentWeekKey);
+    renderRanking(buildDisplayRanking(currentData.signals || []), comparison?.items || []);
+    return;
+  }
+  renderRanking(selectedStoredIndex >= 0 ? storedWeeks[selectedStoredIndex].items : [], previousWeek?.items || []);
 }
 
 function getIsoWeekInfo(date) {
@@ -532,6 +558,58 @@ function formatWeekRange(startDate, endDate) {
   return `${start}–${end}`;
 }
 
+const marketZonesPlugin = {
+  id: 'marketZones',
+  beforeDatasetsDraw(chart, args, options) {
+    if (!options?.mode) return;
+    const { ctx, chartArea, scales } = chart;
+    if (!chartArea || !scales.x || !scales.y) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(chartArea.left, chartArea.top, chartArea.width, chartArea.height);
+    ctx.clip();
+    if (options.mode === 'threshold') {
+      const okY = scales.y.getPixelForValue(options.ok);
+      const stopY = scales.y.getPixelForValue(options.stop);
+      fillChartRect_(ctx, chartArea.left, okY, chartArea.right, chartArea.bottom, 'rgba(120,184,62,0.12)');
+      fillChartRect_(ctx, chartArea.left, stopY, chartArea.right, okY, 'rgba(230,164,0,0.12)');
+      fillChartRect_(ctx, chartArea.left, chartArea.top, chartArea.right, stopY, 'rgba(217,85,63,0.12)');
+    } else if (options.mode === 'dynamic') {
+      fillDynamicChartZone_(ctx, chartArea, scales, options.buy || [], options.sell || []);
+    }
+    ctx.restore();
+  },
+};
+
+function fillChartRect_(ctx, left, top, right, bottom, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(left, Math.min(top, bottom), right - left, Math.abs(bottom - top));
+}
+
+function fillDynamicChartZone_(ctx, chartArea, scales, buyValues, sellValues) {
+  for (let index = 0; index < buyValues.length - 1; index += 1) {
+    const values = [buyValues[index], buyValues[index + 1], sellValues[index], sellValues[index + 1]];
+    if (values.some(value => value === null || value === undefined || Number.isNaN(Number(value)))) continue;
+    const x1 = scales.x.getPixelForValue(index);
+    const x2 = scales.x.getPixelForValue(index + 1);
+    const buy1 = scales.y.getPixelForValue(buyValues[index]);
+    const buy2 = scales.y.getPixelForValue(buyValues[index + 1]);
+    const sell1 = scales.y.getPixelForValue(sellValues[index]);
+    const sell2 = scales.y.getPixelForValue(sellValues[index + 1]);
+    fillZonePolygon_(ctx, [[x1, chartArea.top], [x2, chartArea.top], [x2, buy2], [x1, buy1]], 'rgba(120,184,62,0.12)');
+    fillZonePolygon_(ctx, [[x1, buy1], [x2, buy2], [x2, sell2], [x1, sell1]], 'rgba(230,164,0,0.12)');
+    fillZonePolygon_(ctx, [[x1, sell1], [x2, sell2], [x2, chartArea.bottom], [x1, chartArea.bottom]], 'rgba(217,85,63,0.12)');
+  }
+}
+
+function fillZonePolygon_(ctx, points, color) {
+  ctx.beginPath();
+  points.forEach(([x, y], index) => index ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
 function renderCharts(data) {
   if (!window.Chart) return;
   const fullHistory = data.charts?.history || [];
@@ -541,6 +619,7 @@ function renderCharts(data) {
 
   charts.nasdaq = replaceChart(charts.nasdaq, 'nasdaqChart', {
     type: 'line',
+    plugins: [marketZonesPlugin],
     data: {
       labels,
       datasets: [
@@ -550,6 +629,7 @@ function renderCharts(data) {
         lineDataset('Verkaufs-Linie', history.map(point => point.sellLine), '#d9553f', 2),
       ],
     },
+    options: { plugins: { marketZones: { mode: 'dynamic', buy: history.map(point => point.buyLine), sell: history.map(point => point.sellLine) } } },
   });
 
   charts.signalHistory = replaceChart(charts.signalHistory, 'signalHistoryChart', signalHistoryChartConfig(labels, history));
@@ -648,6 +728,7 @@ function renderChartRangeControl(fullHistory, visibleHistory) {
 function thresholdChartConfig(labels, values, label, ok, stop) {
   return {
     type: 'line',
+    plugins: [marketZonesPlugin],
     data: {
       labels,
       datasets: [
@@ -656,6 +737,7 @@ function thresholdChartConfig(labels, values, label, ok, stop) {
         lineDataset('STOP', values.map(() => stop), '#d9553f', 2),
       ],
     },
+    options: { plugins: { marketZones: { mode: 'threshold', ok, stop } } },
   };
 }
 
@@ -682,6 +764,7 @@ function replaceChart(existing, canvasId, config) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      animation: false,
       ...customOptions,
       plugins: {
         legend: { labels: { color: '#e7d7ad', font: { family: 'IBM Plex Mono' } } },
@@ -912,7 +995,7 @@ function showDashboardLoading() {
   document.querySelector('#latestVxnStatus').textContent = '████';
   document.querySelector('#rankingList').innerHTML = Array.from({ length: 6 }, () => `
     <div class="ranking-row skeleton-row" aria-hidden="true">
-      <span class="rank"></span><div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div><div class="skeleton-score"></div>
+      <span class="rank"></span><div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div><div class="skeleton-score"></div><span></span>
     </div>
   `).join('');
 }
@@ -949,19 +1032,13 @@ function bindEvents() {
   });
 
   document.querySelector('#saveSettingsButton').addEventListener('click', () => {
-    const apiUrl = document.querySelector('#apiUrlInput').value.trim();
-    if (apiUrl && !isAllowedApiUrl(apiUrl)) {
-      setError('Nur eine gültige Apps-Script-/exec-URL ist erlaubt.');
-      return;
-    }
-    localStorage.setItem(STORAGE_KEYS.apiUrl, apiUrl);
     localStorage.setItem(STORAGE_KEYS.apiToken, document.querySelector('#apiTokenInput').value.trim());
     readApi().catch(error => setError(error.message));
   });
 
   document.querySelector('#clearSettingsButton').addEventListener('click', () => {
-    localStorage.removeItem(STORAGE_KEYS.apiUrl);
     localStorage.removeItem(STORAGE_KEYS.apiToken);
+    document.querySelector('#apiTokenInput').value = '';
     readApi().catch(error => setError(error.message));
   });
 
@@ -1020,7 +1097,7 @@ function bindEvents() {
   });
 
   document.querySelector('#rankingSearch').addEventListener('input', () => {
-    renderRanking(currentData.signals || []);
+    renderSelectedWeek();
   });
 
   document.querySelector('#chartRangeControl').addEventListener('click', event => {

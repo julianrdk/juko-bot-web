@@ -84,6 +84,9 @@
           <span id="signalCount" class="muted">—</span>
         </div>
         <input id="rankingSearch" class="search-input" type="search" placeholder="Ticker oder Name suchen" />
+        <div class="ranking-header" aria-hidden="true">
+          <span>Rang</span><span>Ticker</span><span>90T / 7T</span><span>Link</span>
+        </div>
         <div id="rankingList" class="ranking-table"></div>
       </section>
 
@@ -133,7 +136,7 @@
         <article class="chart-card">
           <div class="section-title compact">
             <h2>Nasdaq Signal</h2>
-            <span class="muted">Kurs, SMA200, Kauf-/Verkaufslinie</span>
+            <div class="chart-title-tools"><span class="muted">Kurs, SMA200, Kauf-/Verkaufslinie</span><a class="chart-quote-link" href="https://www.google.com/finance/quote/NDX:INDEXNASDAQ" target="_blank" rel="noopener noreferrer" aria-label="Nasdaq-100 bei Google Finance öffnen">↗</a></div>
           </div>
           <div class="chart-viewport chart-viewport-main"><canvas id="nasdaqChart"></canvas></div>
         </article>
@@ -147,14 +150,14 @@
         <article class="chart-card">
           <div class="section-title compact">
             <h2>VIX</h2>
-            <span class="muted">OK/STOP-Zonen</span>
+            <div class="chart-title-tools"><span class="muted">OK/STOP-Zonen</span><a class="chart-quote-link" href="https://www.google.com/finance/quote/VIX:INDEXCBOE" target="_blank" rel="noopener noreferrer" aria-label="VIX bei Google Finance öffnen">↗</a></div>
           </div>
           <div class="chart-viewport chart-viewport-risk"><canvas id="vixChart"></canvas></div>
         </article>
         <article class="chart-card">
           <div class="section-title compact">
             <h2>VXN</h2>
-            <span class="muted">OK/STOP-Zonen</span>
+            <div class="chart-title-tools"><span class="muted">OK/STOP-Zonen</span><a class="chart-quote-link" href="https://www.google.com/finance/quote/VXN:INDEXCBOE" target="_blank" rel="noopener noreferrer" aria-label="VXN bei Google Finance öffnen">↗</a></div>
           </div>
           <div class="chart-viewport chart-viewport-risk"><canvas id="vxnChart"></canvas></div>
         </article>
@@ -168,12 +171,12 @@
           </div>
         </div>
         <div class="setup-panel embedded">
-          <label for="apiUrlInput">Apps-Script Web-App-URL</label>
-          <input id="apiUrlInput" type="url" placeholder="https://script.google.com/macros/s/.../exec" />
+          <span class="setup-label">API-Verbindung</span>
+          <div id="apiConnectionStatus" class="connection-status">Nicht verbunden</div>
           <label for="apiTokenInput">Depot-Token</label>
           <input id="apiTokenInput" type="password" placeholder="Nur für Depot-Änderungen nötig" />
           <p class="muted small">
-            Die URL und der Token werden nur lokal in diesem Browser gespeichert. Sie stehen nicht im GitHub-Code.
+            Die API-Adresse ist öffentlich und fest in der Web-App hinterlegt. Datenzugriff benötigt eine gültige Sitzung; Depot-Änderungen zusätzlich diesen lokal gespeicherten Token.
           </p>
           <div class="button-row">
             <button id="saveSettingsButton" class="primary-button" type="button">Speichern</button>

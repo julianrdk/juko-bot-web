@@ -623,6 +623,25 @@ input::placeholder { color: #756746; }
   border: 1px solid var(--line-soft);
 }
 
+.ranking-header {
+  display: grid;
+  grid-template-columns: 2.75rem minmax(0, 1fr) minmax(5.3rem, auto) 3rem;
+  margin-top: 0.65rem;
+  border: 1px solid var(--line-soft);
+  border-bottom: 0;
+  padding: 0.45rem 0.65rem 0.45rem 0;
+  color: var(--muted);
+  font-family: var(--pixel);
+  font-size: 0.48rem;
+  text-transform: uppercase;
+}
+
+.ranking-header span:first-child { text-align: center; }
+.ranking-header span:nth-child(2) { padding-left: 0.75rem; }
+.ranking-header span:nth-child(3),
+.ranking-header span:last-child { text-align: right; }
+.ranking-table { margin-top: 0; }
+
 .ranking-row {
   display: grid;
   grid-template-columns: 2.75rem minmax(0, 1fr) minmax(5.3rem, auto) 3rem;
@@ -675,7 +694,15 @@ input::placeholder { color: #756746; }
   color: var(--amber);
   font-family: var(--pixel);
   font-size: 0.66rem;
+  align-content: center;
+  gap: 0.25rem;
 }
+
+.rank strong { font: inherit; }
+.rank small { font-family: var(--mono); font-size: 0.52rem; }
+.movement-up { color: var(--green); }
+.movement-down { color: var(--red); }
+.movement-neutral { color: var(--muted); }
 
 .ticker {
   overflow: hidden;
@@ -686,6 +713,7 @@ input::placeholder { color: #756746; }
 }
 
 .ranking-row > div:nth-child(2) { min-width: 0; padding-left: 0.75rem; }
+.stock-details { padding-top: 0.25rem; padding-bottom: 0.25rem; }
 
 .subtext {
   overflow: hidden;
@@ -696,6 +724,15 @@ input::placeholder { color: #756746; }
   white-space: nowrap;
 }
 
+.stock-name {
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.25;
+}
+
 .block-reason {
   margin-top: 0.15rem;
   color: var(--red);
@@ -704,11 +741,17 @@ input::placeholder { color: #756746; }
 }
 
 .score {
+  display: grid;
   justify-self: end;
+  gap: 0.2rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
+
+.score strong { font-size: inherit; }
+.score small { font-size: 0.6rem; white-space: nowrap; }
+.ranking-empty { padding: 1rem; }
 
 .momentum-positive { color: var(--green); }
 .momentum-negative { color: var(--red); }
@@ -740,6 +783,25 @@ input::placeholder { color: #756746; }
   border-color: #756f62;
   color: #aaa18d;
 }
+
+.chart-title-tools { display: flex; align-items: center; gap: 0.6rem; }
+.chart-quote-link {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--amber-dim);
+  color: var(--amber-bright);
+  font-family: var(--pixel);
+  text-decoration: none;
+}
+.chart-quote-link:hover,
+.chart-quote-link:focus-visible { border-color: var(--amber-bright); outline: 1px solid var(--amber-bright); outline-offset: 2px; }
+
+.setup-label { color: var(--muted); font-size: 0.72rem; }
+.connection-status { border: 1px solid var(--red); padding: 0.75rem; color: var(--red); }
+.connection-status.connected { border-color: var(--green); color: var(--green); }
 
 .skeleton-row,
 .app.is-loading #statusCard {
@@ -774,6 +836,7 @@ input::placeholder { color: #756746; }
 .app.load-failed #statusCard,
 .app.load-failed .section-title,
 .app.load-failed #rankingSearch,
+.app.load-failed .ranking-header,
 .app.load-failed #rankingList { display: none; }
 
 .ticker-form {
@@ -966,9 +1029,12 @@ input::placeholder { color: #756746; }
     padding-right: 0.35rem;
   }
 
+  .ranking-header { grid-template-columns: 2.35rem minmax(0, 1fr) minmax(4.5rem, auto) 3rem; padding-right: 0.35rem; }
+
   .ticker { font-size: 0.83rem; }
   .subtext { font-size: 0.62rem; }
   .score { font-size: 0.78rem; }
+  .score small { font-size: 0.54rem; }
   .quote-link { width: 2.75rem; height: 2.75rem; margin-left: 0.25rem; }
 
   .ticker-form { grid-template-columns: 1fr; }
