@@ -856,6 +856,7 @@ function initializeLockScreen() {
         <span class="money-band"></span>
         <span class="pixel-flame flame-one"></span>
         <span class="pixel-flame flame-two"></span>
+        <span class="pixel-smoke"></span>
         <span class="ash-pile"></span>
       </span>
     `;
@@ -874,7 +875,7 @@ function initializeLockScreen() {
 function registerLockTap(node) {
   lockSequence.push(Number(node.dataset.position));
   const currentStage = Number(node.dataset.stage || 0);
-  const nextStage = Math.min(3, currentStage + 1);
+  const nextStage = Math.min(4, currentStage + 1);
   node.dataset.stage = String(nextStage);
   node.className = `money-node stage-${nextStage}`;
 }
@@ -937,14 +938,26 @@ function resetLockScreen(showError) {
 
 function playUnlockAnimation() {
   const screen = document.querySelector('#lockScreen');
-  screen.classList.add('lock-success');
   document.querySelectorAll('.money-node').forEach((node, index) => {
     window.setTimeout(() => {
-      node.dataset.stage = '3';
-      node.className = 'money-node stage-3 final-burn';
+      node.dataset.stage = '2';
+      node.className = 'money-node stage-2 final-burn';
     }, index * 45);
   });
-  return new Promise(resolve => window.setTimeout(resolve, 760));
+  window.setTimeout(() => {
+    document.querySelectorAll('.money-node').forEach(node => {
+      node.dataset.stage = '3';
+      node.className = 'money-node stage-3 final-burn';
+    });
+  }, 500);
+  window.setTimeout(() => {
+    document.querySelectorAll('.money-node').forEach(node => {
+      node.dataset.stage = '4';
+      node.className = 'money-node stage-4';
+    });
+    screen.classList.add('lock-success');
+  }, 720);
+  return new Promise(resolve => window.setTimeout(resolve, 940));
 }
 
 function unlockDashboard() {

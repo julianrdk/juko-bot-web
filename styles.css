@@ -161,15 +161,15 @@ body.is-locked .app {
   position: absolute;
   z-index: 5;
   display: none;
-  width: 10px;
-  height: 15px;
+  width: 14px;
+  height: 19px;
   background: var(--red);
   box-shadow:
-    0 -8px 0 var(--amber-bright),
-    5px -4px 0 var(--red),
-    9px 3px 0 var(--amber),
-    -5px 5px 0 var(--amber-bright),
-    2px 10px 0 var(--red);
+    0 -11px 0 var(--amber-bright),
+    7px -6px 0 var(--red),
+    12px 3px 0 var(--amber),
+    -7px 6px 0 var(--amber-bright),
+    3px 13px 0 var(--red);
   animation: pixelFlame 300ms steps(2, end) infinite alternate;
 }
 
@@ -184,8 +184,30 @@ body.is-locked .app {
   box-shadow: -3px 4px 0 var(--amber-bright);
 }
 
-.flame-one { right: -1px; bottom: 7px; }
-.flame-two { right: 21px; bottom: -1px; animation-delay: 100ms; }
+.flame-one { right: -3px; bottom: 8px; }
+.flame-two { right: 22px; bottom: -1px; animation-delay: 100ms; }
+
+.pixel-smoke {
+  position: absolute;
+  z-index: 4;
+  top: -20px;
+  right: 7px;
+  display: none;
+  width: 8px;
+  height: 8px;
+  background: #756f62;
+  box-shadow: -8px -9px 0 #594f3d, 4px -18px 0 #8a8170, -5px -27px 0 #4d4639;
+  animation: pixelSmoke 700ms steps(4, end) infinite;
+}
+
+.pixel-smoke::after {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  content: "";
+  background: #a09683;
+  box-shadow: 9px -7px 0 #625a4c;
+}
 
 .ash-pile {
   position: absolute;
@@ -206,16 +228,29 @@ body.is-locked .app {
 .stage-1 .pixel-flame,
 .stage-2 .pixel-flame { display: block; }
 
+.stage-1 .pixel-flame { animation-name: pixelFlame; }
+
 .stage-2 .money-art { transform: scale(0.84); }
 .stage-2 .sheet-back,
 .stage-2 .sheet-middle,
 .stage-2 .money-band { display: none; }
 .stage-2 .sheet-front { top: 10px; left: 6px; transform: rotate(-4deg); }
+.stage-2 .pixel-flame { animation-name: pixelFlameStrong; }
+.stage-2 .pixel-smoke { display: block; }
 
 .stage-3 .money-sheet,
 .stage-3 .money-band,
 .stage-3 .pixel-flame { display: none; }
 .stage-3 .ash-pile { display: block; }
+.stage-3 .pixel-smoke { display: block; top: 0; right: 17px; opacity: 0.75; }
+.stage-3 .ash-pile { box-shadow: 6px -4px 0 #756746, 17px -2px 0 var(--red), 26px -5px 0 #594b32, 33px -2px 0 #756746; }
+
+.stage-4 .money-art { opacity: 0; transform: scale(0.35); }
+.stage-4 .money-sheet,
+.stage-4 .money-band,
+.stage-4 .pixel-flame,
+.stage-4 .pixel-smoke,
+.stage-4 .ash-pile { display: none; }
 
 .unlock-button {
   position: relative;
@@ -294,6 +329,16 @@ body.is-unlocked .app {
 @keyframes pixelFlame {
   from { transform: translate(0, 1px) scale(0.9, 0.82); }
   to { transform: translate(-3px, -5px) scale(1.08, 1.18); }
+}
+
+@keyframes pixelFlameStrong {
+  from { transform: translate(1px, 2px) scale(1.08, 1); }
+  to { transform: translate(-5px, -8px) scale(1.35, 1.5); }
+}
+
+@keyframes pixelSmoke {
+  from { opacity: 0.85; transform: translate(0, 3px); }
+  to { opacity: 0; transform: translate(-5px, -14px); }
 }
 
 @keyframes lockError {
