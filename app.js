@@ -480,6 +480,7 @@ function buildWeeklySummaries(history) {
 }
 
 function calculateWeeklySignal(buyDays, waitDays, sellDays) {
+  if (sellDays >= 3) return 'VERKAUFEN';
   if (buyDays > 0 && sellDays > 0) return 'WARTEN';
   if (sellDays > waitDays) return 'VERKAUFEN';
   if (buyDays > waitDays) return 'KAUFEN';
