@@ -638,6 +638,8 @@ function renderCharts(data) {
   const history = getVisibleChartHistory(fullHistory);
   const labels = history.map(point => formatShortDate(point.date));
   const weekends = history.map(point => Boolean(point.isWeekend));
+  const buyLines = history.map(point => Number.isFinite(Number(point.sma200)) ? Number(point.sma200) : null);
+  const sellLines = buyLines.map(value => value === null ? null : value * 0.99);
   renderChartRangeControl(fullHistory, history);
 
   charts.nasdaq = replaceChart(charts.nasdaq, 'nasdaqChart', {
@@ -648,11 +650,11 @@ function renderCharts(data) {
       datasets: [
         lineDataset('NASDAQ-100', history.map(point => point.nasdaq), '#ffc247', 3),
         lineDataset('SMA200', history.map(point => point.sma200), '#9b8961', 2),
-        lineDataset('Kauf-Linie', history.map(point => point.buyLine), '#78b83e', 2),
-        lineDataset('Verkaufs-Linie', history.map(point => point.sellLine), '#d9553f', 2),
+        lineDataset('Kauf-Linie', buyLines, '#78b83e', 2),
+        lineDataset('Verkaufs-Linie', sellLines, '#d9553f', 2),
       ],
     },
-    options: { plugins: { weekendBands: { weekends }, marketZones: { mode: 'dynamic', buy: history.map(point => point.buyLine), sell: history.map(point => point.sellLine) } } },
+    options: { plugins: { weekendBands: { weekends }, marketZones: { mode: 'dynamic', buy: buyLines, sell: sellLines } } },
   });
 
   charts.signalHistory = replaceChart(charts.signalHistory, 'signalHistoryChart', signalHistoryChartConfig(labels, history));
