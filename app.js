@@ -360,7 +360,7 @@ function renderRanking(items, previousItems = []) {
         <span class="rank"><strong>${item.displayRank}</strong><small class="${movementClass}">${movementLabel}</small></span>
         <div class="stock-details">
           <div class="ticker">${escapeHtml(item.ticker)}</div>
-          <div class="subtext stock-name">${escapeHtml(item.name || '—')} · ${escapeHtml(formatCurrency(item.price))}</div>
+          <div class="subtext stock-name">${escapeHtml(item.name || '—')} · ${escapeHtml(formatCurrency(item.livePrice ?? item.price))}</div>
           ${blockReason ? `<div class="block-reason">${escapeHtml(blockReason)}</div>` : ''}
         </div>
         <div class="score"><strong class="${getMomentumClass(momentum)}">${formatPercent(momentum)}</strong><small class="${getMomentumClass(item.growth7d)}">7T ${formatPercent(item.growth7d)}</small></div>
@@ -581,6 +581,27 @@ const marketZonesPlugin = {
   },
 };
 
+const weekendBandsPlugin = {
+  id: 'weekendBands',
+  beforeDatasetsDraw(chart, args, options) {
+    const weekends = options?.weekends || [];
+    const { ctx, chartArea, scales } = chart;
+    if (!chartArea || !scales.x || !weekends.length) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(130, 124, 110, 0.13)';
+    weekends.forEach((isWeekend, index) => {
+      if (!isWeekend) return;
+      const center = scales.x.getPixelForValue(index);
+      const previous = index > 0 ? scales.x.getPixelForValue(index - 1) : center;
+      const next = index < weekends.length - 1 ? scales.x.getPixelForValue(index + 1) : center;
+      const left = index > 0 ? (previous + center) / 2 : chartArea.left;
+      const right = index < weekends.length - 1 ? (center + next) / 2 : chartArea.right;
+      ctx.fillRect(left, chartArea.top, right - left, chartArea.height);
+    });
+    ctx.restore();
+  },
+};
+
 function fillChartRect_(ctx, left, top, right, bottom, color) {
   ctx.fillStyle = color;
   ctx.fillRect(left, Math.min(top, bottom), right - left, Math.abs(bottom - top));
@@ -612,14 +633,15 @@ function fillZonePolygon_(ctx, points, color) {
 
 function renderCharts(data) {
   if (!window.Chart) return;
-  const fullHistory = data.charts?.history || [];
+  const fullHistory = data.charts?.displayHistory || data.charts?.history || [];
   const history = getVisibleChartHistory(fullHistory);
   const labels = history.map(point => formatShortDate(point.date));
+  const weekends = history.map(point => Boolean(point.isWeekend));
   renderChartRangeControl(fullHistory, history);
 
   charts.nasdaq = replaceChart(charts.nasdaq, 'nasdaqChart', {
     type: 'line',
-    plugins: [marketZonesPlugin],
+    plugins: [weekendBandsPlugin, marketZonesPlugin],
     data: {
       labels,
       datasets: [
@@ -629,13 +651,13 @@ function renderCharts(data) {
         lineDataset('Verkaufs-Linie', history.map(point => point.sellLine), '#d9553f', 2),
       ],
     },
-    options: { plugins: { marketZones: { mode: 'dynamic', buy: history.map(point => point.buyLine), sell: history.map(point => point.sellLine) } } },
+    options: { plugins: { weekendBands: { weekends }, marketZones: { mode: 'dynamic', buy: history.map(point => point.buyLine), sell: history.map(point => point.sellLine) } } },
   });
 
   charts.signalHistory = replaceChart(charts.signalHistory, 'signalHistoryChart', signalHistoryChartConfig(labels, history));
 
-  charts.vix = replaceChart(charts.vix, 'vixChart', thresholdChartConfig(labels, history.map(point => point.vix), 'VIX', data.config?.vixOk || 25, data.config?.vixStop || 30));
-  charts.vxn = replaceChart(charts.vxn, 'vxnChart', thresholdChartConfig(labels, history.map(point => point.vxn), 'VXN', data.config?.vxnOk || 30, data.config?.vxnStop || 35));
+  charts.vix = replaceChart(charts.vix, 'vixChart', thresholdChartConfig(labels, history.map(point => point.vix), 'VIX', data.config?.vixOk || 25, data.config?.vixStop || 30, weekends));
+  charts.vxn = replaceChart(charts.vxn, 'vxnChart', thresholdChartConfig(labels, history.map(point => point.vxn), 'VXN', data.config?.vxnOk || 30, data.config?.vxnStop || 35, weekends));
 }
 
 function signalHistoryChartConfig(labels, history) {
@@ -643,6 +665,7 @@ function signalHistoryChartConfig(labels, history) {
   const pointColors = history.map(point => signalColor(point.signal));
   return {
     type: 'line',
+    plugins: [weekendBandsPlugin],
     data: {
       labels,
       datasets: [{
@@ -661,6 +684,7 @@ function signalHistoryChartConfig(labels, history) {
     },
     options: {
       plugins: {
+        weekendBands: { weekends: history.map(point => Boolean(point.isWeekend)) },
         legend: { display: false },
         tooltip: {
           callbacks: {
@@ -683,12 +707,14 @@ function signalHistoryChartConfig(labels, history) {
 }
 
 function signalToChartValue(signal) {
+  if (!signal) return null;
   if (signal === 'KAUFEN') return 1;
   if (signal === 'VERKAUFEN') return -1;
   return 0;
 }
 
 function chartValueToSignal(value) {
+  if (value === null || value === undefined) return 'Keine Daten';
   if (Number(value) === 1) return 'KAUFEN';
   if (Number(value) === -1) return 'VERKAUFEN';
   return 'WARTEN';
@@ -701,13 +727,64 @@ function signalColor(signal) {
 }
 
 function getVisibleChartHistory(history) {
-  const selectedRange = localStorage.getItem(STORAGE_KEYS.chartDays) || '30';
-  if (selectedRange === 'all') return history;
-  return history.slice(-Number(selectedRange));
+  const selectedRange = getSelectedChartRange();
+  if (!history.length) return [];
+  let visibleHistory;
+  if (selectedRange === 'all') {
+    visibleHistory = history;
+  } else if (selectedRange === '7') {
+    const latestDate = startOfLocalDay(history[history.length - 1].date);
+    const cutoff = new Date(latestDate);
+    cutoff.setDate(cutoff.getDate() - 6);
+    const firstVisibleIndex = history.findIndex(point => startOfLocalDay(point.date) >= cutoff);
+    const sourceStartIndex = Math.max(0, firstVisibleIndex - 1);
+    visibleHistory = expandWeekendHistory(history.slice(sourceStartIndex))
+      .filter(point => startOfLocalDay(point.date) >= cutoff);
+    return visibleHistory;
+  } else {
+    visibleHistory = history.slice(-Number(selectedRange));
+  }
+  return expandWeekendHistory(visibleHistory);
+}
+
+function getSelectedChartRange() {
+  const stored = localStorage.getItem(STORAGE_KEYS.chartDays) || '30';
+  if (stored === '5') {
+    localStorage.setItem(STORAGE_KEYS.chartDays, '7');
+    return '7';
+  }
+  return stored;
+}
+
+function startOfLocalDay(value) {
+  const date = new Date(value);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function expandWeekendHistory(history) {
+  if (!history.length) return [];
+  const expanded = [];
+  history.forEach((point, index) => {
+    if (index > 0) {
+      const previous = history[index - 1];
+      const cursor = startOfLocalDay(previous.date);
+      const currentDate = startOfLocalDay(point.date);
+      cursor.setDate(cursor.getDate() + 1);
+      while (cursor < currentDate) {
+        if (cursor.getDay() === 0 || cursor.getDay() === 6) {
+          const displayDate = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate(), 12);
+          expanded.push({ ...previous, date: displayDate.toISOString(), isWeekend: true, source: 'DISPLAY' });
+        }
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    }
+    expanded.push({ ...point, isWeekend: false });
+  });
+  return expanded;
 }
 
 function renderChartRangeControl(fullHistory, visibleHistory) {
-  const selectedRange = localStorage.getItem(STORAGE_KEYS.chartDays) || '30';
+  const selectedRange = getSelectedChartRange();
   document.querySelectorAll('[data-chart-days]').forEach(button => {
     button.classList.toggle('active', button.dataset.chartDays === selectedRange);
   });
@@ -721,14 +798,15 @@ function renderChartRangeControl(fullHistory, visibleHistory) {
   const firstValue = Number(visibleHistory[0].nasdaq);
   const lastValue = Number(visibleHistory[visibleHistory.length - 1].nasdaq);
   const development = firstValue ? (lastValue / firstValue) - 1 : null;
-  const rangeLabel = selectedRange === 'all' ? 'Alle' : `${visibleHistory.length} Handelstage`;
+  const tradingDays = visibleHistory.filter(point => !point.isWeekend).length;
+  const rangeLabel = selectedRange === 'all' ? 'Alle' : selectedRange === '7' ? '7 Kalendertage' : `${tradingDays} Handelstage`;
   summary.textContent = `${rangeLabel} · ${formatPercent(development)}`;
 }
 
-function thresholdChartConfig(labels, values, label, ok, stop) {
+function thresholdChartConfig(labels, values, label, ok, stop, weekends) {
   return {
     type: 'line',
-    plugins: [marketZonesPlugin],
+    plugins: [weekendBandsPlugin, marketZonesPlugin],
     data: {
       labels,
       datasets: [
@@ -737,7 +815,7 @@ function thresholdChartConfig(labels, values, label, ok, stop) {
         lineDataset('STOP', values.map(() => stop), '#d9553f', 2),
       ],
     },
-    options: { plugins: { marketZones: { mode: 'threshold', ok, stop } } },
+    options: { plugins: { weekendBands: { weekends }, marketZones: { mode: 'threshold', ok, stop } } },
   };
 }
 
